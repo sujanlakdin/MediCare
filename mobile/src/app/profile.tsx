@@ -1,14 +1,24 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View, Text, Image, Switch, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, View, Text, Image, Switch, Pressable, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, MaxContentWidth } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
+  const router = useRouter();
+  const { user, logout } = useAuth();
+
   const [missedAlerts, setMissedAlerts] = useState(true);
   const [refillReminders, setRefillReminders] = useState(true);
   const [dailySummary, setDailySummary] = useState(true);
   const [appointmentReminders, setAppointmentReminders] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    router.replace('/login');
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -18,8 +28,10 @@ export default function ProfileScreen() {
         <View style={styles.wrapper}>
           {/* Header */}
           <View style={styles.headerRow}>
-            <Text style={styles.pageTitle}>Caregiver Profile</Text>
-            <Text style={styles.pageSub}>Sarah's settings</Text>
+            <Text style={styles.pageTitle}>Profile & Settings</Text>
+            <Text style={styles.pageSub}>
+              Logged in as {user?.role ? user.role.toUpperCase() : 'CAREGIVER'}
+            </Text>
           </View>
 
           {/* Profile Card */}
@@ -31,9 +43,11 @@ export default function ProfileScreen() {
               style={styles.avatar}
             />
             <View style={styles.profileTextCol}>
-              <Text style={styles.caregiverName}>Sarah Mitchell</Text>
-              <Text style={styles.roleTitle}>Primary Caregiver</Text>
-              <Text style={styles.emailText}>sarah.mitchell@email.com</Text>
+              <Text style={styles.caregiverName}>{user?.name || 'Sarah Mitchell'}</Text>
+              <Text style={styles.roleTitle}>
+                {user?.role === 'patient' ? 'Patient' : 'Primary Caregiver'}
+              </Text>
+              <Text style={styles.emailText}>{user?.email || 'sarah.mitchell@email.com'}</Text>
             </View>
           </View>
 
@@ -125,6 +139,12 @@ export default function ProfileScreen() {
               </Pressable>
             </View>
           </View>
+
+          {/* Log Out Button */}
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={20} color={Colors.light.alert} />
+            <Text style={styles.logoutBtnText}>Log Out Account</Text>
+          </TouchableOpacity>
 
           {/* Version Footer */}
           <View style={styles.footerContainer}>
@@ -286,6 +306,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.light.primary,
     textAlign: 'center',
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.light.alertBg,
+    borderWidth: 1,
+    borderColor: Colors.light.alertBorder,
+    borderRadius: 14,
+    paddingVertical: 14,
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  logoutBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.light.alert,
   },
   footerContainer: {
     alignItems: 'center',

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -10,9 +10,17 @@ import { StatsGrid } from '@/components/caregiver/StatsGrid';
 import { RecentAlertCard } from '@/components/caregiver/RecentAlertCard';
 import { ScheduleList } from '@/components/caregiver/ScheduleList';
 import { Colors, MaxContentWidth } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user) {
+      router.replace('/login');
+    }
+  }, [user]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -22,7 +30,7 @@ export default function DashboardScreen() {
         <View style={styles.wrapper}>
           {/* Top Header */}
           <CaregiverHeader
-            caregiverName="Sarah"
+            caregiverName={user?.name ? user.name.split(' ')[0] : 'Sarah'}
             subtext="Here's Eleanor's medication update"
             notificationCount={1}
             onNotificationPress={() => router.push('/alerts')}
