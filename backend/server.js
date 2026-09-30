@@ -10,10 +10,12 @@ const authRoutes = require("./routes/authRoutes");
 app.use(cors());
 app.use(express.json());
 
-const mongoURI = process.env.MONGO_URI || "mongodb://localhost:27017/medicare";
+const mongoURI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/medicare";
 
 mongoose
-  .connect(mongoURI)
+  .connect(mongoURI, {
+    serverSelectionTimeoutMS: 5000,
+  })
   .then(() => {
     console.log("MongoDB connected successfully!");
   })
@@ -29,6 +31,7 @@ app.get("/", (req, res) => {
     endpoints: {
       auth: "/api/auth/login, /api/auth/register, /api/auth/me",
     },
+    dbStatus: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
   });
 });
 

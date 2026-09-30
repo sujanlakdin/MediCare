@@ -10,7 +10,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Tabs } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, MaxContentWidth } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
@@ -67,6 +67,7 @@ export default function RegisterScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <Tabs.Screen options={{ tabBarStyle: { display: 'none' }, headerShown: false }} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}>
