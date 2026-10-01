@@ -82,3 +82,118 @@ export const authApi = {
     }
   },
 };
+
+export interface MedicationItem {
+  _id?: string;
+  name: string;
+  dosage: string;
+  frequency?: string;
+  scheduledTime: string;
+  instructions?: string;
+  status?: 'taken' | 'missed' | 'upcoming';
+  adherencePercent?: number;
+}
+
+export interface PatientItem {
+  _id: string;
+  name: string;
+  age: number;
+  role: string;
+  statusBadgeText: string;
+  phone: string;
+  vitals: {
+    bloodPressure: string;
+    heartRate: number;
+    bloodSugar: number;
+  };
+}
+
+export const medicationApi = {
+  getMedications: async (): Promise<MedicationItem[]> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/medications`);
+      if (!res.ok) {
+        return [];
+      }
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      return [];
+    }
+  },
+
+  addMedication: async (payload: {
+    name: string;
+    dosage: string;
+    frequency?: string;
+    scheduledTime: string;
+    instructions?: string;
+  }): Promise<MedicationItem> => {
+    const res = await fetch(`${API_BASE_URL}/medications`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || 'Failed to add medication');
+    }
+    return data;
+  },
+
+  updateMedication: async (
+    id: string,
+    payload: {
+      name?: string;
+      dosage?: string;
+      frequency?: string;
+      scheduledTime?: string;
+      instructions?: string;
+    }
+  ): Promise<MedicationItem> => {
+    const res = await fetch(`${API_BASE_URL}/medications/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || 'Failed to update medication');
+    }
+    return data;
+  },
+
+  updateStatus: async (id: string, status: 'taken' | 'missed' | 'upcoming') => {
+    const res = await fetch(`${API_BASE_URL}/medications/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    return await res.json();
+  },
+
+  deleteMedication: async (id: string): Promise<void> => {
+    const res = await fetch(`${API_BASE_URL}/medications/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || 'Failed to delete medication');
+    }
+  },
+};
+
+export const patientApi = {
+  getPatients: async (): Promise<PatientItem[]> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/patients`);
+      if (!res.ok) {
+        return [];
+      }
+      return await res.json();
+    } catch (error) {
+      return [];
+    }
+  },
+};
+

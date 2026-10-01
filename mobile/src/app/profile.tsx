@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View, Text, Image, Switch, Pressable, TouchableOpacity } from 'react-native';
+import { ScrollView, StyleSheet, View, Text, Image, Switch, Pressable, TouchableOpacity, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, MaxContentWidth } from '@/constants/theme';
@@ -119,7 +119,11 @@ export default function ProfileScreen() {
             <View style={styles.actionsGrid}>
               <Pressable
                 style={styles.actionBtn}
-                onPress={() => alert('Contacting Dr. Patel...')}>
+                onPress={() => {
+                  Linking.openURL('tel:+15550199999').catch(() =>
+                    Alert.alert('Contacting Doctor', 'Dialing Dr. Patel (+1 555-019-9999)...')
+                  );
+                }}>
                 <Ionicons name="call-outline" size={20} color={Colors.light.primary} />
                 <Text style={styles.actionBtnText}>Contact Doctor</Text>
               </Pressable>

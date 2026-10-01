@@ -1,231 +1,307 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
+import { AddMedicationModal } from './AddMedicationModal';
+import { medicationApi, MedicationItem } from '@/services/api';
 
-export interface Medication {
-  id: string;
-  name: string;
-  category: string;
-  frequency: string;
-  prescriber: string;
-  refillDate: string;
-  isRefillUrgent?: boolean;
-}
-
-const DEFAULT_MEDS: Medication[] = [
+const defaultMedicationsList: MedicationItem[] = [
   {
-    id: '1',
+    _id: '1',
     name: 'Lisinopril 10mg',
-    category: 'Blood Pressure',
-    frequency: 'Once daily, Morning 8:00 AM',
-    prescriber: 'Dr. Patel',
-    refillDate: 'Oct 5',
+    dosage: '10mg',
+    scheduledTime: '8:00 AM',
+    instructions: 'Take 1 tablet in the morning with food',
+    status: 'taken',
   },
   {
-    id: '2',
+    _id: '2',
     name: 'Atorvastatin 20mg',
-    category: 'Cholesterol',
-    frequency: 'Once daily, Morning 8:00 AM',
-    prescriber: 'Dr. Patel',
-    refillDate: 'Oct 12',
+    dosage: '20mg',
+    scheduledTime: '8:00 AM',
+    instructions: 'Take 1 tablet at breakfast',
+    status: 'taken',
   },
   {
-    id: '3',
+    _id: '3',
     name: 'Metformin 500mg',
-    category: 'Diabetes',
-    frequency: 'Twice daily, 12:30 PM & 6:00 PM',
-    prescriber: 'Dr. Patel',
-    refillDate: 'Sept 28 *',
-    isRefillUrgent: true,
+    dosage: '500mg',
+    scheduledTime: '12:30 PM & 6:00 PM',
+    instructions: 'Take 1 tablet after meals with water',
+    status: 'missed',
   },
   {
-    id: '4',
+    _id: '4',
     name: 'Amlodipine 5mg',
-    category: 'Blood Pressure',
-    frequency: 'Once daily, Evening 9:00 PM',
-    prescriber: 'Dr. Patel',
-    refillDate: 'Nov 1',
+    dosage: '5mg',
+    scheduledTime: '9:00 PM',
+    instructions: 'Take 1 tablet before bedtime',
+    status: 'upcoming',
   },
 ];
 
 interface MedicationListProps {
-  medications?: Medication[];
   onAddMedication?: () => void;
-  onEditSchedule?: (med: Medication) => void;
+  onEditSchedule?: (med: MedicationItem) => void;
 }
 
-export function MedicationList({
-  medications = DEFAULT_MEDS,
-  onAddMedication,
-  onEditSchedule,
-}: MedicationListProps) {
+export const MedicationList: React.FC<MedicationListProps> = () => {
+  const [medications, setMedications] = useState<MedicationItem[]>(defaultMedicationsList);
+  const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedMed, setSelectedMed] = useState<MedicationItem | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  const fetchMeds = async () => {
+    setLoading(true);
+    const data = await medicationApi.getMedications();
+    if (data && data.length > 0) {
+      setMedications(data);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchMeds();
+  }, []);
+
+  const handleOpenAdd = () => {
+    setSelectedMed(null);
+    setIsEditMode(false);
+    setModalVisible(true);
+  };
+
+  const handleOpenEdit = (med: MedicationItem) => {
+    setSelectedMed(med);
+    setIsEditMode(true);
+    setModalVisible(true);
+  };
+
+  const performDelete = async (med: MedicationItem) => {
+    // Optimistic UI removal
+    setMedications((prev) => prev.filter((item) => item._id !== med._id));
+
+    if (med._id && med._id.length > 5) {
+      try {
+        await medicationApi.deleteMedication(med._id);
+      } catch (error: any) {
+        console.warn('Backend delete failed, fallback to local removal');
+      }
+    }
+  };
+
+  const handleDelete = (med: MedicationItem) => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`Are you sure you want to delete "${med.name}"?`);
+      if (confirmed) {
+        performDelete(med);
+      }
+    } else {
+      Alert.alert(
+        'Delete Medication',
+        `Are you sure you want to remove "${med.name}"?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => performDelete(med),
+          },
+        ]
+      );
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Medication List</Text>
-      <Text style={styles.sectionSub}>Eleanor Johnson's Medications</Text>
+      {/* Section Header */}
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.sectionTitle}>Active Medications</Text>
+          <Text style={styles.subTitle}>Total {medications.length} prescribed</Text>
+        </View>
 
-      <View style={styles.listGap}>
-        {medications.map((med) => (
-          <View
-            key={med.id}
-            style={[
-              styles.medCard,
-              med.isRefillUrgent && styles.urgentCard,
-            ]}>
-            <View style={styles.cardHeader}>
-              <View style={styles.titleRow}>
-                <View style={styles.pillIconBg}>
-                  <Ionicons name="medical-outline" size={16} color={Colors.light.primary} />
-                </View>
-                <View>
-                  <Text style={styles.medName}>{med.name}</Text>
-                  <Text style={styles.medCategory}>{med.category}</Text>
-                </View>
-              </View>
-              <Pressable
-                style={styles.editBtn}
-                onPress={() => onEditSchedule && onEditSchedule(med)}>
-                <Text style={styles.editBtnText}>Edit Schedule</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.cardFooter}>
-              <Text style={styles.freqText}>{med.frequency}</Text>
-              <View style={styles.metaRow}>
-                <Text style={styles.prescriberText}>Prescriber: {med.prescriber}</Text>
-                <Text
-                  style={[
-                    styles.refillText,
-                    med.isRefillUrgent && styles.urgentRefillText,
-                  ]}>
-                  Refill: {med.refillDate}
-                </Text>
-              </View>
-            </View>
-          </View>
-        ))}
+        <TouchableOpacity style={styles.addBtn} onPress={handleOpenAdd}>
+          <Ionicons name="add" size={16} color="#FFFFFF" />
+          <Text style={styles.addBtnText}>Add Medication</Text>
+        </TouchableOpacity>
       </View>
 
-      <Pressable style={styles.addBtn} onPress={onAddMedication}>
-        <Ionicons name="add" size={20} color="#FFFFFF" style={{ marginRight: 6 }} />
-        <Text style={styles.addBtnText}>Add Medication</Text>
-      </Pressable>
+      {/* Medication Items */}
+      {loading ? (
+        <ActivityIndicator color={Colors.light.primary} style={{ marginVertical: 20 }} />
+      ) : (
+        medications.map((med, index) => (
+          <View key={med._id || index} style={styles.medCard}>
+            <View style={styles.medHeaderRow}>
+              <View style={styles.iconTitleRow}>
+                <View style={styles.pillIconCircle}>
+                  <Ionicons name="bandage-outline" size={18} color={Colors.light.primary} />
+                </View>
+                <View>
+                  <Text style={styles.medName}>
+                    {med.name} {med.dosage && !med.name.includes(med.dosage) ? med.dosage : ''}
+                  </Text>
+                  <Text style={styles.timeLabel}>
+                    <Ionicons name="time-outline" size={12} color={Colors.light.textSecondary} />{' '}
+                    {med.scheduledTime}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Action Buttons: Edit & Delete */}
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  style={styles.editBtn}
+                  onPress={() => handleOpenEdit(med)}>
+                  <Ionicons name="create-outline" size={14} color={Colors.light.primary} />
+                  <Text style={styles.editBtnText}>Edit</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={() => handleDelete(med)}>
+                  <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {med.instructions ? (
+              <View style={styles.instructionBox}>
+                <Text style={styles.instructionText}>{med.instructions}</Text>
+              </View>
+            ) : null}
+          </View>
+        ))
+      )}
+
+      {/* Add / Edit Medication Modal */}
+      <AddMedicationModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSuccess={fetchMeds}
+        initialData={selectedMed}
+        isEditMode={isEditMode}
+      />
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     marginBottom: 20,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: Colors.light.primary,
   },
-  sectionSub: {
-    fontSize: 13,
+  subTitle: {
+    fontSize: 12,
     color: Colors.light.textSecondary,
-    marginBottom: 14,
+    marginTop: 2,
   },
-  listGap: {
-    gap: 12,
-    marginBottom: 16,
+  addBtn: {
+    backgroundColor: Colors.light.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    gap: 4,
+  },
+  addBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
   medCard: {
     backgroundColor: Colors.light.cardBackground,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
     borderColor: Colors.light.borderLight,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
+    marginBottom: 10,
   },
-  urgentCard: {
-    borderColor: Colors.light.alertBorder,
-    backgroundColor: '#FFFDFD',
-  },
-  cardHeader: {
+  medHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'center',
   },
-  titleRow: {
+  iconTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
   },
-  pillIconBg: {
+  pillIconCircle: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#E6F4EE',
+    backgroundColor: '#E8F2EC',
     alignItems: 'center',
     justifyContent: 'center',
   },
   medName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: Colors.light.text,
   },
-  medCategory: {
-    fontSize: 11,
+  timeLabel: {
+    fontSize: 12,
     color: Colors.light.textSecondary,
+    marginTop: 2,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   editBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: '#F1F5F9',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
   },
   editBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: Colors.light.primary,
   },
-  cardFooter: {
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingTop: 10,
-    gap: 4,
-  },
-  freqText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.light.text,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 2,
-  },
-  prescriberText: {
-    fontSize: 11,
-    color: Colors.light.textSecondary,
-  },
-  refillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.light.textSecondary,
-  },
-  urgentRefillText: {
-    color: Colors.light.alert,
-    fontWeight: '700',
-  },
-  addBtn: {
-    backgroundColor: Colors.light.primary,
-    borderRadius: 14,
-    paddingVertical: 14,
-    flexDirection: 'row',
+  deleteBtn: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+  instructionBox: {
+    backgroundColor: '#F8FAF8',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 8,
+  },
+  instructionText: {
+    fontSize: 11,
+    color: Colors.light.textSecondary,
   },
 });

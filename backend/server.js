@@ -6,6 +6,8 @@ require("dotenv").config();
 const app = express();
 
 const authRoutes = require("./routes/authRoutes");
+const patientRoutes = require("./routes/patientRoutes");
+const medicationRoutes = require("./routes/medicationRoutes");
 
 app.use(cors());
 app.use(express.json());
@@ -24,12 +26,16 @@ mongoose
   });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/patients", patientRoutes);
+app.use("/api/medications", medicationRoutes);
 
 app.get("/", (req, res) => {
   res.json({
     message: "MediCare Backend is running!",
     endpoints: {
       auth: "/api/auth/login, /api/auth/register, /api/auth/me",
+      patients: "/api/patients",
+      medications: "/api/medications",
     },
     dbStatus: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
   });

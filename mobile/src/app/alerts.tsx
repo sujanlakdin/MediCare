@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View, Text, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, View, Text, Pressable, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, MaxContentWidth } from '@/constants/theme';
@@ -93,7 +93,11 @@ export default function AlertsScreen() {
                 <View style={styles.actionButtonsRow}>
                   <Pressable
                     style={styles.contactBtn}
-                    onPress={() => alert('Dialing Eleanor... +1 (555) 019-2831')}>
+                    onPress={() => {
+                      Linking.openURL('tel:+15550192831').catch(() =>
+                        Alert.alert('Contacting Eleanor', 'Dialing +1 (555) 019-2831...')
+                      );
+                    }}>
                     <Ionicons name="call-outline" size={16} color={Colors.light.primary} />
                     <Text style={styles.contactBtnText}>Contact Eleanor</Text>
                   </Pressable>
