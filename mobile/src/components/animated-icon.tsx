@@ -5,13 +5,17 @@ import { Dimensions, StyleSheet, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { useAccessibility } from '@/contexts/accessibility-context';
+
 const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
 const DURATION = 600;
 
 export function AnimatedSplashOverlay() {
+  const { settings, isLoading } = useAccessibility();
   const [animate, setAnimate] = useState(false);
   const [visible, setVisible] = useState(true);
 
+  if (isLoading || settings.reduceMotion) return null;
   if (!visible) return null;
 
   const splashKeyframe = new Keyframe({
@@ -96,6 +100,15 @@ const glowKeyframe = new Keyframe({
 });
 
 export function AnimatedIcon() {
+  const { settings } = useAccessibility();
+  if (settings.reduceMotion) {
+    return (
+      <View style={styles.iconContainer}>
+        <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.iconContainer}>
       <Animated.View entering={glowKeyframe.duration(60 * 1000 * 4)} style={styles.glow}>
