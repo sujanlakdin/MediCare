@@ -3,11 +3,12 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   ScrollView,
-  TouchableWithoutFeedback,
+  Pressable,
   Keyboard,
   Platform,
   StyleSheet,
   StatusBar,
+  View,
 } from 'react-native';
 import { COLORS } from '../../theme';
 
@@ -15,6 +16,7 @@ import { COLORS } from '../../theme';
  * SafeScreen Wrapper
  * Combines SafeAreaView + KeyboardAvoidingView + ScrollView
  * Guarantees that keyboard interactions never obscure input fields.
+ * Safely supports multiple children and cross-platform (Web, iOS, Android).
  */
 export default function SafeScreen({
   children,
@@ -24,11 +26,30 @@ export default function SafeScreen({
   barStyle = 'light-content',
   backgroundColor = COLORS.surface,
 }) {
-  const innerContent = (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+  const handleDismissKeyboard = () => {
+    if (Platform.OS !== 'web') {
+      Keyboard.dismiss();
+    }
+  };
+
+  const renderContent = () => (
+    <View style={[styles.contentContainer, contentContainerStyle]}>
       {children}
-    </TouchableWithoutFeedback>
+    </View>
   );
+
+  const innerContent =
+    Platform.OS === 'web' ? (
+      renderContent()
+    ) : (
+      <Pressable
+        onPress={handleDismissKeyboard}
+        style={styles.pressableWrapper}
+        accessible={false}
+      >
+        {renderContent()}
+      </Pressable>
+    );
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }, style]}>
@@ -40,7 +61,7 @@ export default function SafeScreen({
         {scrollable ? (
           <ScrollView
             style={styles.scrollView}
-            contentContainerStyle={[styles.scrollContent, contentContainerStyle]}
+            contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
@@ -66,5 +87,13 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+  },
+  pressableWrapper: {
+    flexGrow: 1,
+    flex: 1,
+  },
+  contentContainer: {
+    flexGrow: 1,
+    flex: 1,
   },
 });
