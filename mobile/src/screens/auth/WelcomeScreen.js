@@ -1,290 +1,260 @@
-import React from "react";
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
-  ScrollView,
   StatusBar,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { authService } from "../../services/authService";
+  Dimensions,
+  Platform,
+} from 'react-native';
+import { COLORS, FONTS } from '../../theme';
+import MedicareLogo from '../../components/auth/MedicareLogo';
+import PrimaryButton from '../../components/auth/PrimaryButton';
 
-const THEME = {
-  primary: "#123C2D", // Deep Teal
-  accent: "#38B48B", // Mint Accent
-  background: "#F2F9F5", // Soft Background
-  card: "#FFFFFF", // White Cards
-  border: "#E4ECE6", // Card Border
-  textPrimary: "#123C2D",
-  textSecondary: "#4A6359",
-};
+let RNSvg = null;
+try {
+  RNSvg = require('react-native-svg');
+} catch (e) {}
 
+const { width, height } = Dimensions.get('window');
+
+/**
+ * WelcomeScreen Component
+ * Full-screen deep teal background, abstract art illustration, centered logo tile,
+ * white pill "Get Started" button, and "Already have an account? Sign In" link.
+ */
 export default function WelcomeScreen({ navigation }) {
-  const handleQuickDemo = async () => {
-    await authService.loginAsDemoElderly();
-    if (navigation && navigation.navigate) {
-      navigation.navigate("MyProfile");
+  const isWeb = Platform.OS === 'web';
+
+  const renderBackgroundArt = () => {
+    if (isWeb) {
+      return (
+        <svg
+          viewBox="0 0 390 844"
+          preserveAspectRatio="xMidYMid slice"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+          }}
+          aria-hidden="true"
+        >
+          <path
+            d="M-20 300 C80 260 160 330 260 300 C320 280 380 300 420 270 L420 520 C300 560 200 500 100 540 C40 560 0 540 -20 520Z"
+            fill="#2E7F76"
+            opacity=".35"
+          />
+          <path
+            d="M-20 560 C100 520 180 600 300 560 C350 545 400 560 420 540 L420 860 L-20 860Z"
+            fill="#0B3434"
+            opacity=".55"
+          />
+          <ellipse cx="215" cy="560" rx="120" ry="70" fill="#E8A184" opacity=".85" />
+          <ellipse cx="270" cy="600" rx="60" ry="46" fill="#F0B79D" opacity=".9" />
+          <ellipse cx="170" cy="520" rx="46" ry="30" fill="#D98E73" opacity=".8" />
+          <g fill="#E58B7E">
+            <circle cx="60" cy="640" r="9" />
+            <circle cx="330" cy="700" r="8" />
+            <circle cx="90" cy="410" r="7" />
+            <circle cx="320" cy="400" r="8" />
+            <circle cx="40" cy="760" r="10" />
+          </g>
+          <g fill="#F2A98F" opacity=".9">
+            <ellipse cx="120" cy="690" rx="16" ry="6" transform="rotate(-30 120 690)" />
+            <ellipse cx="300" cy="460" rx="16" ry="6" transform="rotate(25 300 460)" />
+            <ellipse cx="70" cy="520" rx="14" ry="5" transform="rotate(-50 70 520)" />
+            <ellipse cx="350" cy="620" rx="14" ry="5" transform="rotate(40 350 620)" />
+          </g>
+        </svg>
+      );
     }
+
+    if (RNSvg) {
+      const { Svg, Path, Ellipse, Circle, G } = RNSvg;
+      return (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Svg
+            viewBox="0 0 390 844"
+            preserveAspectRatio="xMidYMid slice"
+            style={StyleSheet.absoluteFill}
+          >
+            <Path
+              d="M-20 300 C80 260 160 330 260 300 C320 280 380 300 420 270 L420 520 C300 560 200 500 100 540 C40 560 0 540 -20 520Z"
+              fill="#2E7F76"
+              opacity={0.35}
+            />
+            <Path
+              d="M-20 560 C100 520 180 600 300 560 C350 545 400 560 420 540 L420 860 L-20 860Z"
+              fill="#0B3434"
+              opacity={0.55}
+            />
+            <Ellipse cx={215} cy={560} rx={120} ry={70} fill="#E8A184" opacity={0.85} />
+            <Ellipse cx={270} cy={600} rx={60} ry={46} fill="#F0B79D" opacity={0.9} />
+            <Ellipse cx={170} cy={520} rx={46} ry={30} fill="#D98E73" opacity={0.8} />
+            <G fill="#E58B7E">
+              <Circle cx={60} cy={640} r={9} />
+              <Circle cx={330} cy={700} r={8} />
+              <Circle cx={90} cy={410} r={7} />
+              <Circle cx={320} cy={400} r={8} />
+              <Circle cx={40} cy={760} r={10} />
+            </G>
+            <G fill="#F2A98F" opacity={0.9}>
+              <Ellipse cx={120} cy={690} rx={16} ry={6} transform="rotate(-30 120 690)" />
+              <Ellipse cx={300} cy={460} rx={16} ry={6} transform="rotate(25 300 460)" />
+              <Ellipse cx={70} cy={520} rx={14} ry={5} transform="rotate(-50 70 520)" />
+              <Ellipse cx={350} cy={620} rx={14} ry={5} transform="rotate(40 350 620)" />
+            </G>
+          </Svg>
+        </View>
+      );
+    }
+
+    // Pure React Native geometric decorative shapes
+    return (
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <View style={styles.artOrb1} />
+        <View style={styles.artOrb2} />
+        <View style={styles.artOrb3} />
+      </View>
+    );
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={THEME.background} />
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Brand Header */}
-        <View style={styles.header}>
-          <View style={styles.logoBadge}>
-            <Ionicons name="medical" size={44} color={THEME.primary} />
-          </View>
-          <Text style={styles.appTitle}>MediCare</Text>
-          <Text style={styles.tagline}>
-            Senior Health & Medication Companion
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#1B5A5C" />
+
+      {/* Full-screen background art */}
+      {renderBackgroundArt()}
+
+      {/* Floating Center Logo Tile */}
+      <View style={styles.logoTileWrapper}>
+        <MedicareLogo
+          size={84}
+          borderRadius={20}
+          showLabel={false}
+          variant="plain"
+        />
+      </View>
+
+      {/* Bottom Actions Container */}
+      <View style={styles.actionsContainer}>
+        <PrimaryButton
+          title="Get Started"
+          variant="white"
+          onPress={() => navigation?.navigate('SignUp')}
+          accessibilityLabel="Get Started with MediCare. Create a new account."
+        />
+
+        <View style={styles.signinRow}>
+          <Text style={styles.signinText} allowFontScaling={true}>
+            Already have an account?
           </Text>
-        </View>
-
-        {/* Elderly Reassurance Card */}
-        <View style={styles.welcomeCard}>
-          <View style={styles.cardHeader}>
-            <Ionicons
-              name="shield-checkmark"
-              size={32}
-              color={THEME.accent}
-              style={{ marginRight: 10 }}
-            />
-            <Text style={styles.cardTitle}>Safe & Simple</Text>
-          </View>
-          <Text style={styles.cardBody}>
-            Designed especially for seniors. Easy to read, simple to use, and always
-            here to help you stay on track with your medications and care.
-          </Text>
-
-          <View style={styles.featureRow}>
-            <Ionicons name="checkmark-circle" size={24} color={THEME.accent} />
-            <Text style={styles.featureText}>Extra Large, Easy-to-Tap Buttons</Text>
-          </View>
-          <View style={styles.featureRow}>
-            <Ionicons name="checkmark-circle" size={24} color={THEME.accent} />
-            <Text style={styles.featureText}>Clear, Plain English Language</Text>
-          </View>
-          <View style={styles.featureRow}>
-            <Ionicons name="checkmark-circle" size={24} color={THEME.accent} />
-            <Text style={styles.featureText}>Direct Emergency Support (1990)</Text>
-          </View>
-        </View>
-
-        {/* Primary Action Buttons (Fitts's Law Large Targets) */}
-        <View style={styles.actionContainer}>
           <TouchableOpacity
-            style={styles.primaryButton}
-            activeOpacity={0.85}
-            onPress={() => navigation?.navigate("Login")}
-            accessibilityLabel="Sign In to My Account"
+            onPress={() => navigation?.navigate('Login')}
             accessibilityRole="button"
+            accessibilityLabel="Already have an account? Sign In"
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            activeOpacity={0.7}
           >
-            <Ionicons name="log-in-outline" size={26} color="#FFFFFF" />
-            <Text style={styles.primaryButtonText}>Sign In to My Account</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            activeOpacity={0.85}
-            onPress={() => navigation?.navigate("Register")}
-            accessibilityLabel="Create New Account"
-            accessibilityRole="button"
-          >
-            <Ionicons name="person-add-outline" size={24} color={THEME.primary} />
-            <Text style={styles.secondaryButtonText}>Create New Account</Text>
-          </TouchableOpacity>
-
-          {/* Quick Demo Access for Grading / Milestone Evaluation */}
-          <TouchableOpacity
-            style={styles.demoButton}
-            activeOpacity={0.85}
-            onPress={handleQuickDemo}
-            accessibilityLabel="One-Tap Demo as Chathura Rajapakse"
-            accessibilityRole="button"
-          >
-            <Ionicons name="flash-outline" size={22} color={THEME.accent} />
-            <Text style={styles.demoButtonText}>
-              One-Tap Demo: Chathura (72 yrs)
+            <Text style={styles.signinLink} allowFontScaling={true}>
+              Sign In
             </Text>
           </TouchableOpacity>
         </View>
+      </View>
 
-        {/* Emergency Assistance Banner */}
-        <View style={styles.emergencyBanner}>
-          <Ionicons name="call" size={22} color="#D9383A" />
-          <Text style={styles.emergencyText}>
-            Medical Emergency? Call{" "}
-            <Text style={styles.emergencyBold}>1990 Suwa Seriya</Text>
-          </Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+      {/* Bottom Home Indicator Bar */}
+      <View style={styles.homeBar} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: THEME.background,
+    backgroundColor: '#124447',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
   },
-  scrollContainer: {
-    paddingHorizontal: 22,
-    paddingTop: 36,
-    paddingBottom: 40,
-    alignItems: "center",
+  artOrb1: {
+    position: 'absolute',
+    top: height * 0.35,
+    right: -40,
+    width: width * 0.7,
+    height: width * 0.7,
+    borderRadius: (width * 0.7) / 2,
+    backgroundColor: '#2E7F76',
+    opacity: 0.35,
   },
-  header: {
-    alignItems: "center",
-    marginBottom: 24,
+  artOrb2: {
+    position: 'absolute',
+    bottom: height * 0.18,
+    left: -20,
+    width: width * 0.8,
+    height: width * 0.8,
+    borderRadius: (width * 0.8) / 2,
+    backgroundColor: '#0B3434',
+    opacity: 0.55,
   },
-  logoBadge: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: "#DDF1E8",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 14,
-    borderWidth: 2,
-    borderColor: THEME.accent,
+  artOrb3: {
+    position: 'absolute',
+    bottom: height * 0.22,
+    alignSelf: 'center',
+    width: 240,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: '#E8A184',
+    opacity: 0.85,
   },
-  appTitle: {
-    fontSize: 34,
-    fontWeight: "800",
-    color: THEME.primary,
-    letterSpacing: 0.5,
+  logoTileWrapper: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 220 : 190,
+    alignSelf: 'center',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    elevation: 10,
   },
-  tagline: {
-    fontSize: 17,
-    color: THEME.textSecondary,
-    marginTop: 6,
-    textAlign: "center",
-    fontWeight: "500",
+  actionsContainer: {
+    width: '100%',
+    paddingHorizontal: 40,
+    paddingBottom: Platform.OS === 'ios' ? 64 : 48,
+    zIndex: 20,
+    alignItems: 'center',
   },
-  welcomeCard: {
-    width: "100%",
-    backgroundColor: THEME.card,
-    borderRadius: 20,
-    padding: 22,
-    borderWidth: 1.5,
-    borderColor: THEME.border,
-    marginBottom: 26,
-    shadowColor: THEME.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
+  signinRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 26,
+    gap: 6,
   },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
+  signinText: {
+    color: COLORS.white,
+    fontSize: FONTS.sizes.body - 1,
+    fontWeight: FONTS.weights.semibold,
   },
-  cardTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: THEME.primary,
+  signinLink: {
+    color: COLORS.white,
+    fontSize: FONTS.sizes.body - 1,
+    fontWeight: FONTS.weights.heavy,
+    textDecorationLine: 'underline',
   },
-  cardBody: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: THEME.textSecondary,
-    marginBottom: 18,
-  },
-  featureRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  featureText: {
-    fontSize: 16,
-    color: THEME.textPrimary,
-    fontWeight: "600",
-    marginLeft: 10,
-  },
-  actionContainer: {
-    width: "100%",
-    gap: 14,
-    marginBottom: 24,
-  },
-  primaryButton: {
-    width: "100%",
-    height: 58,
-    backgroundColor: THEME.primary,
-    borderRadius: 16,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
-    shadowColor: THEME.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  secondaryButton: {
-    width: "100%",
-    height: 58,
-    backgroundColor: THEME.card,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: THEME.primary,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
-  },
-  secondaryButtonText: {
-    color: THEME.primary,
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  demoButton: {
-    width: "100%",
-    height: 54,
-    backgroundColor: "#EAF6F0",
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: THEME.accent,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-  },
-  demoButtonText: {
-    color: THEME.primary,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  emergencyBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FEECEC",
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#F5C2C2",
-    gap: 8,
-  },
-  emergencyText: {
-    fontSize: 14,
-    color: "#7A1D1E",
-  },
-  emergencyBold: {
-    fontWeight: "800",
-    color: "#D9383A",
+  homeBar: {
+    position: 'absolute',
+    bottom: 10,
+    alignSelf: 'center',
+    width: 134,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
   },
 });

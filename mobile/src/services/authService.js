@@ -1,51 +1,43 @@
-import { Platform } from "react-native";
-
 /**
- * Member 1: Authentication Service
- * Communicates with /api/auth endpoints on the MediCare backend.
+ * Authentication Service (Member 1: Authentication Screens)
+ * 
+ * Provides mock asynchronous auth functions returning Promises with a short delay.
+ * Includes TODO hooks for backend API endpoints and outlines the future database schema.
+ * 
+ * TODO: Connect real API / database
+ * Future "users" table fields to support:
+ * - id: String / UUID primary key
+ * - full_name: String
+ * - email: String (unique)
+ * - phone: String (Sri Lankan format)
+ * - password_hash: String (bcrypt)
+ * - role: 'patient' | 'caregiver'
+ * - created_at: Timestamp (ISO8601)
  */
 
-// Auto-detect base URL based on platform
-const DEFAULT_PORT = 5000;
-const getBaseUrl = () => {
-  if (Platform.OS === "android") {
-    // Android Emulator connects to localhost via 10.0.2.2
-    return `http://10.0.2.2:${DEFAULT_PORT}/api/auth`;
-  }
-  // iOS Simulator and Web use localhost
-  return `http://localhost:${DEFAULT_PORT}/api/auth`;
-};
+// Simulated network latency helper
+const delay = (ms = 450) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const API_AUTH_URL = getBaseUrl();
-
-// In-memory user session state (works reliably without external async-storage packages)
+// In-memory mock session store
 let currentUser = {
-  _id: "demo_chathura_72",
-  fullName: "Chathura Rajapakse",
+  id: "usr_demo_101",
+  full_name: "Chathura Rajapakse",
   email: "chathura.rajapakse@medicare.com",
-  phone: "+94 77 123 4567",
-  age: 72,
-  residentialAddress: "No. 45, Temple Road, Colombo 03",
-  medicalId: "MED-72491",
-  accessibilitySettings: {
-    highContrast: false,
-    largerTouchTargets: true,
-    voiceAssistance: false,
-    reduceMotion: false,
-    simpleLanguage: true,
-    textSize: "large",
-  },
+  phone: "+94771234567",
+  role: "patient",
+  created_at: new Date().toISOString(),
 };
+
 let authToken = "demo-bearer-token-medicare";
 
 export const authService = {
   /**
-   * Get currently authenticated user
+   * Get currently authenticated user session
    */
   getCurrentUser: () => currentUser,
 
   /**
-   * Update local user state
+   * Update in-memory user
    */
   setCurrentUser: (user) => {
     currentUser = { ...currentUser, ...user };
@@ -53,154 +45,184 @@ export const authService = {
   },
 
   /**
-   * Log in user
+   * Log in with Email or Phone and Password
+   * Supports both login(id, password) and login({ id/email, password })
+   * @param {string|object} idOrCredentials - Email or Phone string, or credentials object
+   * @param {string} [password] - Account password
    */
-  login: async (credentials) => {
-    try {
-      const response = await fetch(`${API_AUTH_URL}/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(credentials),
-      });
+  login: async (idOrCredentials, password) => {
+    await delay(500);
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to log in.");
-      }
+    let identifier = "";
+    let pwd = "";
 
-      if (data.user) {
-        currentUser = data.user;
-        authToken = data.token;
-      }
-      return data;
-    } catch (error) {
-      console.warn("authService.login backend unavailable or error:", error.message);
-      // Elderly fallback / offline fallback for demonstration and testing
-      if (
-        credentials.email &&
-        credentials.email.toLowerCase().includes("chathura")
-      ) {
-        return {
-          success: true,
-          message: "Welcome back, Chathura Rajapakse!",
-          user: currentUser,
-          token: authToken,
-        };
-      }
-      throw error;
+    if (typeof idOrCredentials === "object" && idOrCredentials !== null) {
+      identifier = (idOrCredentials.id || idOrCredentials.email || "").trim();
+      pwd = idOrCredentials.password || "";
+    } else {
+      identifier = (idOrCredentials || "").trim();
+      pwd = password || "";
     }
+
+    // TODO: Connect real API / database endpoint: POST /api/auth/login
+    // Payload: { identifier, password: pwd }
+
+    // Mock validation check
+    if (!identifier || !pwd) {
+      throw new Error("Please enter both your identifier and password.");
+    }
+
+    if (pwd.length < 6) {
+      throw new Error("Password must be at least 6 characters.");
+    }
+
+    // Demo success
+    currentUser = {
+      id: "usr_" + Date.now(),
+      full_name: identifier.includes("@")
+        ? identifier.split("@")[0].replace(".", " ")
+        : "MediCare User",
+      email: identifier.includes("@") ? identifier : "user@medicare.com",
+      phone: !identifier.includes("@") ? identifier : "+94771234567",
+      role: "patient",
+      created_at: new Date().toISOString(),
+    };
+    authToken = "demo-token-" + Date.now();
+
+    return {
+      success: true,
+      message: "Signed in successfully.",
+      user: currentUser,
+      token: authToken,
+    };
   },
 
   /**
-   * Register new elderly user
+   * Register a new user
+   * @param {object} params
+   * @param {string} params.name - Full name
+   * @param {string} params.email - Email ID
+   * @param {string} params.password - Account password
+   * @param {string} params.role - 'patient' | 'caregiver'
    */
-  register: async (userData) => {
-    try {
-      const response = await fetch(`${API_AUTH_URL}/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(userData),
-      });
+  register: async ({ name, fullName, email, password, role = "patient" }) => {
+    await delay(600);
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to register.");
-      }
+    const displayName = (name || fullName || "").trim();
+    const userEmail = (email || "").trim().toLowerCase();
 
-      if (data.user) {
-        currentUser = data.user;
-        authToken = data.token;
-      }
-      return data;
-    } catch (error) {
-      console.warn("authService.register backend error:", error.message);
-      // Offline fallback
-      const simulatedUser = {
-        _id: "reg_" + Date.now(),
-        ...userData,
-        age: Number(userData.age) || 72,
-        accessibilitySettings: {
-          highContrast: false,
-          largerTouchTargets: true,
-          voiceAssistance: false,
-          reduceMotion: false,
-          simpleLanguage: true,
-          textSize: "large",
-        },
-      };
-      currentUser = simulatedUser;
+    // TODO: Connect real API / database endpoint: POST /api/auth/register
+    // Future database table schema insertion:
+    // INSERT INTO users (id, full_name, email, password_hash, role, created_at)
+    // VALUES (uuid(), displayName, userEmail, hash(password), role, NOW())
+
+    if (!displayName || displayName.length < 2) {
+      throw new Error("Full name must be at least 2 characters.");
+    }
+    if (!userEmail) {
+      throw new Error("A valid email address is required.");
+    }
+    if (!password || password.length < 8) {
+      throw new Error("Password must be at least 8 characters long.");
+    }
+
+    currentUser = {
+      id: "usr_" + Date.now(),
+      full_name: displayName,
+      email: userEmail,
+      phone: "+94771234567",
+      role: role === "caregiver" ? "caregiver" : "patient",
+      created_at: new Date().toISOString(),
+    };
+    authToken = "demo-token-" + Date.now();
+
+    return {
+      success: true,
+      message: "Registration successful. Welcome to MediCare!",
+      user: currentUser,
+      token: authToken,
+    };
+  },
+
+  /**
+   * Send password reset OTP code to email or phone
+   * @param {string} id - Email or Phone number
+   */
+  sendResetCode: async (id) => {
+    await delay(500);
+
+    // TODO: Connect real API / database endpoint: POST /api/auth/send-reset-code
+    // Generates 6-digit OTP, stores temporary hash with 10-minute expiry, and dispatches SMS/email.
+
+    const identifier = (id || "").trim();
+    if (!identifier) {
+      throw new Error("Please enter your email or phone number.");
+    }
+
+    return {
+      success: true,
+      destination: identifier,
+      message: `Reset code sent to ${identifier}.`,
+      demoCode: "123456", // Temporary testing code before backend integration
+    };
+  },
+
+  /**
+   * Verify 6-digit OTP code
+   * @param {string} id - Email or phone
+   * @param {string} code - 6-digit code
+   */
+  verifyOtp: async (id, code) => {
+    await delay(450);
+
+    // TODO: Connect real API / database endpoint: POST /api/auth/verify-otp
+    // Compares incoming OTP with database record and returns a signed reset token.
+
+    const trimmedCode = (code || "").trim();
+    if (trimmedCode === "123456") {
       return {
         success: true,
-        message: "Registration successful. Welcome to MediCare!",
-        user: simulatedUser,
-        token: "demo-token-" + Date.now(),
+        resetToken: "temp-reset-token-" + Date.now(),
+        message: "Code verified successfully.",
       };
     }
+
+    throw new Error("That code is not correct. Check it and try again.");
   },
 
   /**
-   * Request password reset code
+   * Reset Password with new password
+   * @param {string} id - Email or phone
+   * @param {string} newPassword - New password
+   */
+  resetPassword: async (id, newPassword) => {
+    await delay(500);
+
+    // TODO: Connect real API / database endpoint: POST /api/auth/reset-password
+    // Updates users table: UPDATE users SET password_hash = hash(newPassword) WHERE email = id OR phone = id
+
+    if (!newPassword || newPassword.length < 8) {
+      throw new Error("New password must be at least 8 characters long.");
+    }
+
+    return {
+      success: true,
+      message: "Password updated successfully.",
+    };
+  },
+
+  /**
+   * Compatibility alias for older screen calls
    */
   forgotPassword: async (email) => {
-    try {
-      const response = await fetch(`${API_AUTH_URL}/forgot-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to request reset code.");
-      }
-      return data;
-    } catch (error) {
-      console.warn("authService.forgotPassword backend error:", error.message);
-      return {
-        success: true,
-        verificationCode: "123456",
-        message: "Verification code sent. For testing, use code: 123456",
-      };
-    }
+    return authService.sendResetCode(email);
   },
 
   /**
-   * Reset password with verification code
-   */
-  resetPassword: async ({ email, resetCode, newPassword }) => {
-    try {
-      const response = await fetch(`${API_AUTH_URL}/reset-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, resetCode, newPassword }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to reset password.");
-      }
-      return data;
-    } catch (error) {
-      console.warn("authService.resetPassword backend error:", error.message);
-      return {
-        success: true,
-        message: "Password updated successfully. You can now log in.",
-      };
-    }
-  },
-
-  /**
-   * Convenience demo login as Chathura Rajapakse (72 yrs)
+   * Demo one-tap elderly sign in
    */
   loginAsDemoElderly: async () => {
+    await delay(200);
     return {
       success: true,
       user: currentUser,
@@ -209,9 +231,10 @@ export const authService = {
   },
 
   /**
-   * Logout
+   * Logout and clear local session
    */
   logout: async () => {
+    await delay(150);
     authToken = null;
     return { success: true };
   },
