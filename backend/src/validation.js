@@ -55,4 +55,16 @@ function readObjectId(value) {
   return value;
 }
 
-module.exports = { fail, readBoolean, readDate, readEmail, readObjectId, readPhone, readString };
+function readAge(value, { required = false } = {}) {
+  if (value === undefined || value === null || value === "") {
+    if (required) fail("Age is required.");
+    return undefined;
+  }
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0 || num > 150) {
+    fail("Enter a valid age between 0 and 150.");
+  }
+  return Math.round(num);
+}
+
+module.exports = { fail, readAge, readBoolean, readDate, readEmail, readObjectId, readPhone, readString };

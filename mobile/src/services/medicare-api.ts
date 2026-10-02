@@ -12,10 +12,13 @@ export type Profile = {
   fullName: string;
   email: string;
   phone: string;
-  dateOfBirth: string;
-  gender: string;
+  age?: number;
+  dateOfBirth?: string;
+  gender?: string;
   address: string;
-  emergencyContact: EmergencyContact;
+  medicalId?: string;
+  profileImage?: string;
+  emergencyContact?: EmergencyContact;
 };
 
 export type Caregiver = {
@@ -23,10 +26,13 @@ export type Caregiver = {
   name: string;
   relationship: string;
   phone: string;
-  email: string;
-  isPrimary: boolean;
-  medicationAlerts: boolean;
-  missedMedicationAlerts: boolean;
+  email?: string;
+  isPrimary?: boolean;
+  medicationAlerts?: boolean;
+  missedMedicationAlerts?: boolean;
+  active?: boolean;
+  dailyAdherenceSummary?: boolean;
+  avatar?: string;
 };
 
 export type NotificationSettings = {
@@ -36,9 +42,27 @@ export type NotificationSettings = {
   missedMedicationAlerts: boolean;
   caregiverNotifications: boolean;
   preferredReminderTime: string;
+  missedDoseAlerts: boolean;
+  caregiverSync: boolean;
+  soundAssistance: boolean;
+  vibrationMode: boolean;
+  morningReminderTime: string;
+  noonReminderTime: string;
+  eveningReminderTime: string;
+};
+
+export type AccessibilitySettings = {
+  fontSize: 'standard' | 'large' | 'extraLarge';
+  highContrast: boolean;
+  largerButtons: boolean;
+  largerTouchTargets: boolean;
+  voiceAssistance: boolean;
+  reduceMotion: boolean;
+  simpleLanguage: boolean;
 };
 
 export type ProfileChanges = Partial<Omit<Profile, '_id' | 'emergencyContact'>>;
+
 
 export function getProfile(token: string) {
   return apiRequest<{ profile: Profile }>('/api/users/profile', { token });
@@ -89,3 +113,19 @@ export function updateEmergencyContact(token: string, contact: EmergencyContact)
     method: 'PUT', token, body: contact,
   });
 }
+
+export function getAccessibilitySettings(token: string) {
+  return apiRequest<{ settings: AccessibilitySettings }>('/api/users/accessibility-settings', { token });
+}
+
+export function updateAccessibilitySettings(token: string, settings: Partial<AccessibilitySettings>) {
+  return apiRequest<{ settings: AccessibilitySettings }>('/api/users/accessibility-settings', {
+    method: 'PUT', token, body: settings,
+  });
+}
+
+export function submitSupport(token: string, payload: { subject: string; description: string }) {
+  return apiRequest<{ id: string; message: string }>('/api/support', {
+    method: 'POST', token, body: payload,
+  });
+}

@@ -7,7 +7,10 @@ export type AccessibilitySettings = {
   fontSize: 'standard' | 'large' | 'extraLarge';
   highContrast: boolean;
   largerButtons: boolean;
+  largerTouchTargets: boolean;
+  voiceAssistance: boolean;
   reduceMotion: boolean;
+  simpleLanguage: boolean;
 };
 
 type AccessibilityContextValue = {
@@ -20,9 +23,13 @@ const defaults: AccessibilitySettings = {
   fontSize: 'standard',
   highContrast: false,
   largerButtons: false,
+  largerTouchTargets: false,
+  voiceAssistance: false,
   reduceMotion: false,
+  simpleLanguage: false,
 };
 const AccessibilityContext = createContext<AccessibilityContextValue | null>(null);
+
 
 export function AccessibilityProvider({ children }: PropsWithChildren) {
   const { token } = useAuth();
