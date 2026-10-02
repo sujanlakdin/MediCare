@@ -21,12 +21,7 @@ function caregiverFields(body, { partial = false } = {}) {
   if (!partial || Object.prototype.hasOwnProperty.call(body, "email")) {
     fields.email = readEmail(body.email || "", { required: false });
   }
-  if (!partial || Object.prototype.hasOwnProperty.call(body, "avatar")) {
-    if (body.avatar !== undefined) {
-      fields.avatar = readString(body.avatar, "Avatar", { required: false, maxLength: 5000 });
-    }
-  }
-  for (const key of ["isPrimary", "medicationAlerts", "missedMedicationAlerts", "active", "dailyAdherenceSummary"]) {
+  for (const key of ["isPrimary", "medicationAlerts", "missedMedicationAlerts"]) {
     if (!partial && body[key] !== undefined) fields[key] = readBoolean(body[key], key);
     if (partial && Object.prototype.hasOwnProperty.call(body, key)) fields[key] = readBoolean(body[key], key);
   }

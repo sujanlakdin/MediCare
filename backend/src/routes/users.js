@@ -1,7 +1,6 @@
 const express = require("express");
 const User = require("../models/User");
 const {
-  readAge,
   readBoolean,
   readDate,
   readEmail,
@@ -16,25 +15,8 @@ const notificationKeys = [
   "vibration",
   "missedMedicationAlerts",
   "caregiverNotifications",
-  "missedDoseAlerts",
-  "caregiverSync",
-  "soundAssistance",
-  "vibrationMode",
 ];
-const notificationStringKeys = [
-  "preferredReminderTime",
-  "morningReminderTime",
-  "noonReminderTime",
-  "eveningReminderTime",
-];
-const accessibilityKeys = [
-  "highContrast",
-  "largerButtons",
-  "largerTouchTargets",
-  "voiceAssistance",
-  "reduceMotion",
-  "simpleLanguage",
-];
+const accessibilityKeys = ["highContrast", "largerButtons", "reduceMotion"];
 
 function pickSettings(input, booleanKeys, extraKeys = []) {
   const settings = {};
@@ -46,15 +28,8 @@ function pickSettings(input, booleanKeys, extraKeys = []) {
       settings[key] = readString(input[key], key, { maxLength: 20 });
     }
   }
-  for (const timeKey of notificationStringKeys) {
-    if (Object.prototype.hasOwnProperty.call(settings, timeKey) && !/^([01]\d|2[0-3]):[0-5]\d$/.test(settings[timeKey])) {
-      const error = new Error(`${timeKey} must use 24-hour HH:MM format.`);
-      error.statusCode = 400;
-      throw error;
-    }
-  }
-  if (Object.prototype.hasOwnProperty.call(settings, "fontSize") && !["standard", "large", "extraLarge"].includes(settings.fontSize)) {
-    const error = new Error("fontSize must be standard, large, or extraLarge.");
+  if (Object.prototype.hasOwnProperty.call(settings, "preferredReminderTime") && !/^([01]\d|2[0-3]):[0-5]\d$/.test(settings.preferredReminderTime)) {
+    const error = new Error("Preferred reminder time must use 24-hour HH:MM format.");
     error.statusCode = 400;
     throw error;
   }
@@ -82,21 +57,12 @@ router.put("/profile", async (req, res) => {
   if (Object.prototype.hasOwnProperty.call(body, "phone")) {
     updates.phone = readPhone(body.phone, { required: false });
   }
-  if (Object.prototype.hasOwnProperty.call(body, "age")) {
-    updates.age = readAge(body.age, { required: false });
-  }
   if (Object.prototype.hasOwnProperty.call(body, "dateOfBirth")) updates.dateOfBirth = readDate(body.dateOfBirth);
   if (Object.prototype.hasOwnProperty.call(body, "gender")) {
     updates.gender = readString(body.gender, "Gender", { required: false, maxLength: 60 });
   }
   if (Object.prototype.hasOwnProperty.call(body, "address")) {
     updates.address = readString(body.address, "Address", { required: false, maxLength: 300 });
-  }
-  if (Object.prototype.hasOwnProperty.call(body, "medicalId")) {
-    updates.medicalId = readString(body.medicalId, "Medical ID", { required: false, maxLength: 60 });
-  }
-  if (Object.prototype.hasOwnProperty.call(body, "profileImage")) {
-    updates.profileImage = readString(body.profileImage, "Profile image", { required: false, maxLength: 5000 });
   }
   if (!Object.keys(updates).length) {
     const error = new Error("Provide at least one profile field to update.");
@@ -123,20 +89,7 @@ router.get("/notification-settings", async (req, res) => {
 });
 
 router.put("/notification-settings", async (req, res) => {
-  const settings = pickSettings(req.body, notificationKeys, notificationStringKeys);
-  // Synchronize aliases
-  if (settings.missedDoseAlerts !== undefined) settings.missedMedicationAlerts = settings.missedDoseAlerts;
-  else if (settings.missedMedicationAlerts !== undefined) settings.missedDoseAlerts = settings.missedMedicationAlerts;
-
-  if (settings.caregiverSync !== undefined) settings.caregiverNotifications = settings.caregiverSync;
-  else if (settings.caregiverNotifications !== undefined) settings.caregiverSync = settings.caregiverNotifications;
-
-  if (settings.soundAssistance !== undefined) settings.reminderSound = settings.soundAssistance;
-  else if (settings.reminderSound !== undefined) settings.soundAssistance = settings.reminderSound;
-
-  if (settings.vibrationMode !== undefined) settings.vibration = settings.vibrationMode;
-  else if (settings.vibration !== undefined) settings.vibrationMode = settings.vibration;
-
+  const settings = pickSettings(req.body, notificationKeys, ["preferredReminderTime"]);
   const user = await User.findByIdAndUpdate(
     req.userId,
     { $set: Object.fromEntries(Object.entries(settings).map(([key, value]) => [`notificationSettings.${key}`, value])) },
@@ -154,10 +107,6 @@ router.get("/accessibility-settings", async (req, res) => {
 
 router.put("/accessibility-settings", async (req, res) => {
   const settings = pickSettings(req.body, accessibilityKeys, ["fontSize"]);
-  // Synchronize largerTouchTargets and largerButtons
-  if (settings.largerTouchTargets !== undefined) settings.largerButtons = settings.largerTouchTargets;
-  else if (settings.largerButtons !== undefined) settings.largerTouchTargets = settings.largerButtons;
-
   const user = await User.findByIdAndUpdate(
     req.userId,
     { $set: Object.fromEntries(Object.entries(settings).map(([key, value]) => [`accessibilitySettings.${key}`, value])) },

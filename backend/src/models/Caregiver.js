@@ -10,9 +10,6 @@ const caregiverSchema = new mongoose.Schema(
     isPrimary: { type: Boolean, default: false },
     medicationAlerts: { type: Boolean, default: true },
     missedMedicationAlerts: { type: Boolean, default: true },
-    active: { type: Boolean, default: true },
-    dailyAdherenceSummary: { type: Boolean, default: true },
-    avatar: { type: String, default: "" },
   },
   { timestamps: true }
 );

@@ -16,7 +16,7 @@ type MenuItem = {
   id: string;
   title: string;
   subtitle: string;
-  icon: { ios?: any; android?: string; web?: string };
+  icon: { ios?: string; android?: string; web?: string };
   badge?: string;
   onPress: () => void;
 };
@@ -131,10 +131,7 @@ export default function MainMenuScreen() {
   ];
 
   return (
-    <Screen
-      title="Main Menu"
-      subtitle="Quick access to your medication care"
-      simpleSubtitle="Main options">
+    <Screen title="Main Menu" subtitle="Quick access to your medication care">
       {user ? (
         <ThemedView type="backgroundElement" style={styles.patientBanner}>
           <View style={styles.patientAvatar}>
@@ -168,7 +165,7 @@ export default function MainMenuScreen() {
                 a11y.largerButtons && styles.largeMenuCard,
               ]}>
               <View style={styles.iconCircle}>
-                <SymbolView name={item.icon} size={24} tintColor="#145c44" />
+                <SymbolView name={item.icon as any} size={24} tintColor="#145c44" />
               </View>
 
               <View style={styles.textContainer}>

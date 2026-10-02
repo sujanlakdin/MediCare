@@ -1,216 +1,57 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { SymbolView } from 'expo-symbols';
+import { StyleSheet, View } from 'react-native';
 
+import { Collapsible } from '@/components/ui/collapsible';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { useAccessibility } from '@/contexts/accessibility-context';
-import { useTheme } from '@/hooks/use-theme';
 
-type FaqItemData = {
-  id: string;
-  question: string;
-  answer: string;
-};
-
-const faqData: FaqItemData[] = [
+const questions = [
   {
-    id: 'reminders',
-    question: 'How do medication reminders work?',
-    answer:
-      'MediCare alerts you at your configured reminder times (Morning, Noon, and Evening). When an alert sounds, tap the notification on your phone to confirm your dose was taken, or snooze if you need a few minutes.',
+    category: 'Medication reminders',
+    items: [
+      ['How do I add a medication?', 'Medication management is not available in this project yet. When that feature is added, you will be able to enter a medication and its schedule there.'],
+      ['How does a medication reminder work?', 'The notification settings can be saved to your account. Device reminders are not connected yet because this project does not have a medication schedule or notification service.'],
+      ['What happens if I miss a medication?', 'You can turn on missed medication alerts in Notification Settings. Alerts will become active when medication tracking is implemented.'],
+    ],
   },
   {
-    id: 'caregiver_missed',
-    question: 'Can my caregiver see if I missed a dose?',
-    answer:
-      'Yes. When you link a trusted caregiver under Emergency & Caregiver and leave "Medication Dose SMS Alerts" enabled, they receive an automated update if a scheduled medication window passes without confirmation.',
+    category: 'Caregivers',
+    items: [
+      ['How do I add a caregiver?', 'Open Settings, choose Emergency & caregivers, then select Add caregiver. Enter their name, relationship, phone number, and any optional preferences.'],
+      ['How does a caregiver receive notifications?', 'You can choose which alerts a caregiver is allowed to receive. Delivery is not active until a notification service is connected.'],
+      ['Can I remove a caregiver?', 'Yes. Open Emergency & caregivers, choose the caregiver, and select Remove.'],
+    ],
   },
   {
-    id: 'volume',
-    question: 'How do I change the alert volume?',
-    answer:
-      'You can customize voice assistance, reminder sound, and vibration mode in Settings > Notification Settings. For ringtone loudness, use your phone\'s side volume buttons while an alert is playing.',
+    category: 'Account',
+    items: [
+      ['How do I update my profile?', 'Open your Profile tab, select Edit profile, make your changes, and save.'],
+      ['How do I change my settings?', 'Open the Settings tab and choose the area you want to update.'],
+    ],
   },
   {
-    id: 'privacy',
-    question: 'Is my medical data kept private?',
-    answer:
-      'Yes, absolutely. All your medical data, profile records, and caregiver relationships are stored securely using encryption. Only you and caregivers you explicitly authorize have access to your medication schedule.',
-  },
-  {
-    id: 'text_size',
-    question: 'Can I make the text bigger and easier to read?',
-    answer:
-      'Yes! Open Settings > Accessibility Options. You can choose between Standard, Large, and Extra Large text sizes, as well as enable High Contrast and Larger Touch Targets for effortless reading.',
-  },
-  {
-    id: 'emergency',
-    question: 'What happens when I press Call 119 or SOS Alert?',
-    answer:
-      'Emergency buttons are designed for urgent situations. Tapping Call 119 asks for confirmation before dialing national emergency services. Sending an SOS Alert immediately notifies your active linked caregivers.',
+    category: 'Accessibility',
+    items: [
+      ['How do I increase the font size?', 'Open Settings, select Accessibility, choose Large or Extra large, and save your settings.'],
+      ['How do I enable high contrast mode?', 'Open Settings, select Accessibility, turn on High contrast, and save your settings.'],
+    ],
   },
 ];
 
 export default function FaqScreen() {
-  const [expandedId, setExpandedId] = useState<string | null>('reminders');
-
-  function toggleItem(id: string) {
-    setExpandedId((current) => (current === id ? null : id));
-  }
-
   return (
-    <Screen
-      title="FAQs"
-      subtitle="Find answers to common questions"
-      simpleSubtitle="Questions and answers">
-      <View style={styles.faqList}>
-        {faqData.map((item) => (
-          <FaqAccordionItem
-            key={item.id}
-            item={item}
-            isExpanded={expandedId === item.id}
-            onToggle={() => toggleItem(item.id)}
-          />
-        ))}
-      </View>
+    <Screen title="Frequently asked questions" subtitle="Select a question to see its answer">
+      {questions.map((section) => (
+        <View key={section.category} style={styles.section}>
+          <ThemedText type="smallBold">{section.category}</ThemedText>
+          {section.items.map(([question, answer]) => (
+            <Collapsible key={question} title={question}>
+              <ThemedText>{answer}</ThemedText>
+            </Collapsible>
+          ))}
+        </View>
+      ))}
     </Screen>
   );
 }
 
-function FaqAccordionItem({
-  item,
-  isExpanded,
-  onToggle,
-}: {
-  item: FaqItemData;
-  isExpanded: boolean;
-  onToggle: () => void;
-}) {
-  const theme = useTheme();
-  const { settings: a11y } = useAccessibility();
-
-  return (
-    <ThemedView
-      type="backgroundElement"
-      style={[
-        styles.card,
-        isExpanded && styles.cardExpanded,
-        a11y.largerButtons && styles.cardLarge,
-      ]}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${item.question}. ${isExpanded ? 'Expanded' : 'Collapsed'}`}
-        accessibilityHint="Double tap to toggle answer"
-        onPress={onToggle}
-        style={({ pressed }) => [
-          styles.headerPressable,
-          pressed && styles.pressed,
-        ]}>
-        <View style={styles.questionRow}>
-          <View style={styles.bulletDot} />
-          <ThemedText
-            type="smallBold"
-            style={[
-              styles.questionText,
-              isExpanded && styles.questionTextExpanded,
-            ]}>
-            {item.question}
-          </ThemedText>
-        </View>
-
-        <View style={styles.chevronWrapper}>
-          <SymbolView
-            name={{
-              ios: isExpanded ? 'chevron.up' : 'chevron.down',
-              android: isExpanded ? 'expand_less' : 'expand_more',
-              web: isExpanded ? 'expand_less' : 'expand_more',
-            }}
-            size={20}
-            tintColor={isExpanded ? '#145c44' : theme.textSecondary}
-          />
-        </View>
-      </Pressable>
-
-      {isExpanded ? (
-        <View style={styles.answerContainer}>
-          <View style={styles.divider} />
-          <ThemedText style={styles.answerText}>{item.answer}</ThemedText>
-        </View>
-      ) : null}
-    </ThemedView>
-  );
-}
-
-const styles = StyleSheet.create({
-  faqList: {
-    gap: Spacing.three,
-    marginBottom: Spacing.four,
-  },
-  card: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    overflow: 'hidden',
-  },
-  cardExpanded: {
-    borderColor: '#86efac',
-    backgroundColor: '#fbfdfc',
-  },
-  cardLarge: {
-    borderRadius: 16,
-  },
-  headerPressable: {
-    minHeight: 64,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.three,
-    gap: Spacing.three,
-  },
-  pressed: {
-    opacity: 0.75,
-  },
-  questionRow: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  bulletDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#145c44',
-  },
-  questionText: {
-    flex: 1,
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  questionTextExpanded: {
-    color: '#145c44',
-  },
-  chevronWrapper: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  answerContainer: {
-    paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.three,
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: '#e5e7eb',
-    marginBottom: Spacing.two,
-  },
-  answerText: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#374151',
-  },
-});
+const styles = StyleSheet.create({ section: { gap: 12 } });

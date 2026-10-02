@@ -8,13 +8,6 @@ const notificationSettingsSchema = new mongoose.Schema(
     missedMedicationAlerts: { type: Boolean, default: true },
     caregiverNotifications: { type: Boolean, default: true },
     preferredReminderTime: { type: String, default: "09:00" },
-    missedDoseAlerts: { type: Boolean, default: true },
-    caregiverSync: { type: Boolean, default: true },
-    soundAssistance: { type: Boolean, default: true },
-    vibrationMode: { type: Boolean, default: true },
-    morningReminderTime: { type: String, default: "08:00" },
-    noonReminderTime: { type: String, default: "12:30" },
-    eveningReminderTime: { type: String, default: "20:00" },
   },
   { _id: false }
 );
@@ -24,10 +17,7 @@ const accessibilitySettingsSchema = new mongoose.Schema(
     fontSize: { type: String, enum: ["standard", "large", "extraLarge"], default: "standard" },
     highContrast: { type: Boolean, default: false },
     largerButtons: { type: Boolean, default: false },
-    largerTouchTargets: { type: Boolean, default: false },
-    voiceAssistance: { type: Boolean, default: false },
     reduceMotion: { type: Boolean, default: false },
-    simpleLanguage: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -48,12 +38,9 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254 },
     passwordHash: { type: String, required: true, select: false },
     phone: { type: String, default: "", trim: true, maxlength: 30 },
-    age: { type: Number, min: 0, max: 150 },
     dateOfBirth: { type: String, default: "" },
     gender: { type: String, default: "", trim: true, maxlength: 60 },
     address: { type: String, default: "", trim: true, maxlength: 300 },
-    medicalId: { type: String, default: "", trim: true, maxlength: 60 },
-    profileImage: { type: String, default: "" },
     notificationSettings: { type: notificationSettingsSchema, default: () => ({}) },
     accessibilitySettings: { type: accessibilitySettingsSchema, default: () => ({}) },
     emergencyContact: { type: emergencyContactSchema, default: () => ({}) },
