@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,11 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
+import { router } from 'expo-router';
 import { COLORS, FONTS } from '../../theme';
 import MedicareLogo from '../../components/auth/MedicareLogo';
 import PrimaryButton from '../../components/auth/PrimaryButton';
+import authService from '../../services/authService';
 
 let RNSvg = null;
 try {
@@ -26,6 +28,33 @@ const { width, height } = Dimensions.get('window');
  */
 export default function WelcomeScreen({ navigation }) {
   const isWeb = Platform.OS === 'web';
+
+  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    authService.isAuthenticated ? authService.isAuthenticated() : Boolean(currentUser)
+  );
+
+  useEffect(() => {
+    const unsubscribe = authService.subscribe?.((user) => {
+      setCurrentUser(user);
+      setIsAuthenticated(Boolean(user));
+    });
+    return () => unsubscribe?.();
+  }, []);
+
+  const goToDashboard = () => {
+    if (navigation?.navigate) {
+      try {
+        navigation.navigate('/(patient)/dashboard');
+      } catch (e) {
+        router.replace('/(patient)/dashboard');
+      }
+    } else {
+      router.replace('/(patient)/dashboard');
+    }
+  };
+
+  const firstName = currentUser?.full_name ? currentUser.full_name.split(' ')[0] : 'Patient';
 
   const renderBackgroundArt = () => {
     if (isWeb) {
@@ -142,29 +171,66 @@ export default function WelcomeScreen({ navigation }) {
 
       {/* Bottom Actions Container */}
       <View style={styles.actionsContainer}>
-        <PrimaryButton
-          title="Get Started"
-          variant="white"
-          onPress={() => navigation?.navigate('SignUp')}
-          accessibilityLabel="Get Started with MediCare. Create a new account."
-        />
+        {isAuthenticated && currentUser ? (
+          <>
+            <PrimaryButton
+              title={`Continue to Dashboard (${firstName})`}
+              variant="white"
+              onPress={goToDashboard}
+              accessibilityLabel={`Continue to Dashboard as ${firstName}`}
+            />
 
-        <View style={styles.signinRow}>
-          <Text style={styles.signinText} allowFontScaling={true}>
-            Already have an account?
-          </Text>
-          <TouchableOpacity
-            onPress={() => navigation?.navigate('Login')}
-            accessibilityRole="button"
-            accessibilityLabel="Already have an account? Sign In"
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.signinLink} allowFontScaling={true}>
-              Sign In
-            </Text>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.authSwitchRow}>
+              <TouchableOpacity
+                onPress={() => navigation?.navigate('Login')}
+                accessibilityRole="button"
+                accessibilityLabel="Switch Account or Sign In"
+                activeOpacity={0.7}
+              >
+                <Text style={styles.authSwitchLink} allowFontScaling={true}>
+                  Switch Account
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.authSwitchDivider}>•</Text>
+              <TouchableOpacity
+                onPress={() => navigation?.navigate('SignUp')}
+                accessibilityRole="button"
+                accessibilityLabel="Create a new account"
+                activeOpacity={0.7}
+              >
+                <Text style={styles.authSwitchLink} allowFontScaling={true}>
+                  Create New Account
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <>
+            <PrimaryButton
+              title="Get Started"
+              variant="white"
+              onPress={() => navigation?.navigate('SignUp')}
+              accessibilityLabel="Get Started with MediCare. Create a new account."
+            />
+
+            <View style={styles.signinRow}>
+              <Text style={styles.signinText} allowFontScaling={true}>
+                Already have an account?
+              </Text>
+              <TouchableOpacity
+                onPress={() => navigation?.navigate('Login')}
+                accessibilityRole="button"
+                accessibilityLabel="Already have an account? Sign In"
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.signinLink} allowFontScaling={true}>
+                  Sign In
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </View>
 
       {/* Bottom Home Indicator Bar */}
@@ -247,6 +313,23 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.body - 1,
     fontWeight: FONTS.weights.heavy,
     textDecorationLine: 'underline',
+  },
+  authSwitchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    gap: 12,
+  },
+  authSwitchLink: {
+    color: COLORS.white,
+    fontSize: FONTS.sizes.sm + 0.5,
+    fontWeight: FONTS.weights.semibold,
+    textDecorationLine: 'underline',
+  },
+  authSwitchDivider: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: FONTS.sizes.sm,
   },
   homeBar: {
     position: 'absolute',

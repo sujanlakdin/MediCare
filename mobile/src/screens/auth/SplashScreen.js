@@ -7,38 +7,53 @@ import {
   StatusBar,
   Dimensions,
 } from 'react-native';
+import { router } from 'expo-router';
 import { COLORS, FONTS } from '../../theme';
 import MedicareLogo from '../../components/auth/MedicareLogo';
+import authService from '../../services/authService';
 
 /**
  * SplashScreen
  * Displays large logo tile (150x150), MediCare title, and tagline on mint background.
- * Automatically navigates to Welcome after 2.2 seconds (or immediately on tap).
+ * If user is already authenticated, seamlessly routes them to /(patient)/dashboard.
+ * Otherwise, transitions to Welcome screen.
  */
 export default function SplashScreen({ navigation }) {
   useEffect(() => {
     const timer = setTimeout(() => {
-      goToWelcome();
-    }, 2200);
+      goToNext();
+    }, 2000);
 
     return () => clearTimeout(timer);
   }, []);
 
-  const goToWelcome = () => {
-    if (navigation?.replace) {
-      navigation.replace('Welcome');
-    } else if (navigation?.navigate) {
-      navigation.navigate('Welcome');
+  const goToNext = () => {
+    if (authService.isAuthenticated && authService.isAuthenticated()) {
+      if (navigation?.navigate) {
+        try {
+          navigation.navigate('/(patient)/dashboard');
+        } catch (e) {
+          router.replace('/(patient)/dashboard');
+        }
+      } else {
+        router.replace('/(patient)/dashboard');
+      }
+    } else {
+      if (navigation?.replace) {
+        navigation.replace('Welcome');
+      } else if (navigation?.navigate) {
+        navigation.navigate('Welcome');
+      }
     }
   };
 
   return (
     <TouchableOpacity
       style={styles.container}
-      onPress={goToWelcome}
+      onPress={goToNext}
       activeOpacity={0.98}
       accessibilityRole="button"
-      accessibilityLabel="MediCare Splash Screen. Tap to continue to Welcome screen."
+      accessibilityLabel="MediCare Splash Screen. Tap to continue."
     >
       <StatusBar barStyle="dark-content" backgroundColor="#D8F0EE" />
 

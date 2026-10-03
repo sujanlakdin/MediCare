@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
+import { router } from 'expo-router';
 import { COLORS, FONTS } from '../../theme';
 import SafeScreen from '../../components/auth/SafeScreen';
 import AuthHeader from '../../components/auth/AuthHeader';
@@ -30,6 +31,20 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
+
+  // Active session detection for seamless auth/dashboard switching
+  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    authService.isAuthenticated ? authService.isAuthenticated() : Boolean(currentUser)
+  );
+
+  useEffect(() => {
+    const unsubscribe = authService.subscribe?.((user) => {
+      setCurrentUser(user);
+      setIsAuthenticated(Boolean(user));
+    });
+    return () => unsubscribe?.();
+  }, []);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -80,17 +95,19 @@ export default function LoginScreen({ navigation }) {
     try {
       const response = await authService.login(identifier, password);
       showToast(response.message || 'Login successful!');
-      // Route to user home / profile if available or demo success
+      
+      // Navigate to patient dashboard upon successful login
       setTimeout(() => {
         if (navigation?.navigate) {
-          // If MyProfile route exists in root, navigate to it; otherwise show success
           try {
-            navigation.navigate('MyProfile');
+            navigation.navigate('/(patient)/dashboard');
           } catch (e) {
-            // Navigator stays on login with toast
+            router.replace('/(patient)/dashboard');
           }
+        } else {
+          router.replace('/(patient)/dashboard');
         }
-      }, 700);
+      }, 600);
     } catch (err) {
       showToast(err.message || 'Login failed. Please try again.');
     } finally {
@@ -100,6 +117,18 @@ export default function LoginScreen({ navigation }) {
 
   const handleSocialSelect = (provider) => {
     showToast(`${provider} sign-in will be connected to the backend later`);
+  };
+
+  const goToDashboard = () => {
+    if (navigation?.navigate) {
+      try {
+        navigation.navigate('/(patient)/dashboard');
+      } catch (e) {
+        router.replace('/(patient)/dashboard');
+      }
+    } else {
+      router.replace('/(patient)/dashboard');
+    }
   };
 
   return (
@@ -113,6 +142,29 @@ export default function LoginScreen({ navigation }) {
 
       {/* Main Form Body */}
       <View style={styles.formBody}>
+        {/* Seamless Navigation Banner for Authenticated Users */}
+        {isAuthenticated && currentUser && (
+          <View style={styles.authenticatedBanner}>
+            <View style={styles.authBannerTextContainer}>
+              <Text style={styles.authBannerTitle} numberOfLines={1} allowFontScaling={true}>
+                Signed in: {currentUser.full_name || currentUser.email}
+              </Text>
+              <Text style={styles.authBannerSubtitle} allowFontScaling={true}>
+                Active patient session found
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.authBannerButton}
+              onPress={goToDashboard}
+              accessibilityRole="button"
+              accessibilityLabel="Go to Patient Dashboard"
+            >
+              <Text style={styles.authBannerButtonText} allowFontScaling={true}>
+                Dashboard →
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
         {/* Email or Phone Field */}
         <AuthInput
           icon="user"
@@ -225,5 +277,41 @@ const styles = StyleSheet.create({
     color: COLORS.brand,
     fontSize: FONTS.sizes.body - 1,
     fontWeight: FONTS.weights.heavy,
+  },
+  authenticatedBanner: {
+    backgroundColor: '#E7F7EF',
+    borderColor: '#B9E8D1',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  authBannerTextContainer: {
+    flex: 1,
+  },
+  authBannerTitle: {
+    fontSize: FONTS.sizes.sm + 0.5,
+    fontWeight: FONTS.weights.bold,
+    color: '#0D5C3A',
+  },
+  authBannerSubtitle: {
+    fontSize: FONTS.sizes.caption,
+    color: '#3B735B',
+    marginTop: 2,
+  },
+  authBannerButton: {
+    backgroundColor: COLORS.brand,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  authBannerButtonText: {
+    color: COLORS.white,
+    fontSize: FONTS.sizes.caption + 1,
+    fontWeight: FONTS.weights.bold,
   },
 });

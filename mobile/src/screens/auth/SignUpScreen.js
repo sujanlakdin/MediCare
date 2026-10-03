@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
+import { router } from 'expo-router';
 import { COLORS, FONTS } from '../../theme';
 import SafeScreen from '../../components/auth/SafeScreen';
 import AuthHeader from '../../components/auth/AuthHeader';
@@ -136,6 +137,20 @@ export default function SignUpScreen({ navigation }) {
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
 
+  // Active session detection for seamless auth/dashboard switching
+  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    authService.isAuthenticated ? authService.isAuthenticated() : Boolean(currentUser)
+  );
+
+  useEffect(() => {
+    const unsubscribe = authService.subscribe?.((user) => {
+      setCurrentUser(user);
+      setIsAuthenticated(Boolean(user));
+    });
+    return () => unsubscribe?.();
+  }, []);
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setToastVisible(true);
@@ -233,32 +248,43 @@ export default function SignUpScreen({ navigation }) {
 
     setLoading(true);
     try {
-      await authService.register({
+      const response = await authService.register({
         name: fullName,
         email: email.trim(),
         password,
         role,
       });
 
-      // Route to Success Screen
-      const successTitle = 'Account created';
-      const successMessage =
-        role === 'caregiver'
-          ? 'Welcome to MediCare. Sign in to link your patient.'
-          : 'Welcome to MediCare. Sign in to set up your profile.';
+      showToast(response?.message || 'Account created successfully!');
 
-      if (navigation?.navigate) {
-        navigation.navigate('Success', {
-          title: successTitle,
-          message: successMessage,
-          buttonText: 'Go to Login',
-          nextRoute: 'Login',
-        });
-      }
+      // Navigate to patient dashboard upon successful registration
+      setTimeout(() => {
+        if (navigation?.navigate) {
+          try {
+            navigation.navigate('/(patient)/dashboard');
+          } catch (e) {
+            router.replace('/(patient)/dashboard');
+          }
+        } else {
+          router.replace('/(patient)/dashboard');
+        }
+      }, 600);
     } catch (err) {
       showToast(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const goToDashboard = () => {
+    if (navigation?.navigate) {
+      try {
+        navigation.navigate('/(patient)/dashboard');
+      } catch (e) {
+        router.replace('/(patient)/dashboard');
+      }
+    } else {
+      router.replace('/(patient)/dashboard');
     }
   };
 
@@ -276,6 +302,30 @@ export default function SignUpScreen({ navigation }) {
       />
 
       <View style={styles.formBody}>
+        {/* Seamless Navigation Banner for Authenticated Users */}
+        {isAuthenticated && currentUser && (
+          <View style={styles.authenticatedBanner}>
+            <View style={styles.authBannerTextContainer}>
+              <Text style={styles.authBannerTitle} numberOfLines={1} allowFontScaling={true}>
+                Signed in: {currentUser.full_name || currentUser.email}
+              </Text>
+              <Text style={styles.authBannerSubtitle} allowFontScaling={true}>
+                Active patient session found
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.authBannerButton}
+              onPress={goToDashboard}
+              accessibilityRole="button"
+              accessibilityLabel="Go to Patient Dashboard"
+            >
+              <Text style={styles.authBannerButtonText} allowFontScaling={true}>
+                Dashboard →
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Role Selector: Patient vs Caregiver */}
         <View
           style={styles.roleContainer}
@@ -542,5 +592,41 @@ const styles = StyleSheet.create({
     color: COLORS.brand,
     fontSize: FONTS.sizes.body - 1,
     fontWeight: FONTS.weights.heavy,
+  },
+  authenticatedBanner: {
+    backgroundColor: '#E7F7EF',
+    borderColor: '#B9E8D1',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  authBannerTextContainer: {
+    flex: 1,
+  },
+  authBannerTitle: {
+    fontSize: FONTS.sizes.sm + 0.5,
+    fontWeight: FONTS.weights.bold,
+    color: '#0D5C3A',
+  },
+  authBannerSubtitle: {
+    fontSize: FONTS.sizes.caption,
+    color: '#3B735B',
+    marginTop: 2,
+  },
+  authBannerButton: {
+    backgroundColor: COLORS.brand,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  authBannerButtonText: {
+    color: COLORS.white,
+    fontSize: FONTS.sizes.caption + 1,
+    fontWeight: FONTS.weights.bold,
   },
 });

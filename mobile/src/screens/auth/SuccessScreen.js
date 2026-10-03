@@ -59,10 +59,12 @@ function CheckmarkIcon({ size = 52 }) {
   );
 }
 
+import { router } from 'expo-router';
+
 /**
  * SuccessScreen Component
  * Displays a celebratory green circular check badge, route-driven title & message,
- * and a direct action button to proceed back to Login.
+ * and a direct action button to proceed back to Login or Dashboard.
  */
 export default function SuccessScreen({ route, navigation }) {
   const params = route?.params || {};
@@ -74,6 +76,11 @@ export default function SuccessScreen({ route, navigation }) {
   const nextRoute = params.nextRoute || 'Login';
 
   const handleAction = () => {
+    if (nextRoute && (nextRoute.startsWith('/') || nextRoute === 'Dashboard')) {
+      const destination = nextRoute === 'Dashboard' ? '/(patient)/dashboard' : nextRoute;
+      router.replace(destination);
+      return;
+    }
     if (navigation?.reset) {
       navigation.reset({
         index: 0,

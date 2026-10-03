@@ -30,7 +30,39 @@ let currentUser = {
 
 let authToken = "demo-bearer-token-medicare";
 
+// Auth state change listeners
+const authListeners = new Set();
+const notifyAuthChange = (user) => {
+  authListeners.forEach((fn) => {
+    try {
+      fn(user);
+    } catch (e) {
+      console.warn("Auth listener error:", e);
+    }
+  });
+};
+
 export const authService = {
+  /**
+   * Check if user is currently authenticated
+   */
+  isAuthenticated: () => Boolean(authToken && currentUser),
+
+  /**
+   * Get active auth token
+   */
+  getToken: () => authToken,
+
+  /**
+   * Subscribe to auth session changes (login, logout, user update)
+   */
+  subscribe: (callback) => {
+    authListeners.add(callback);
+    return () => {
+      authListeners.delete(callback);
+    };
+  },
+
   /**
    * Get currently authenticated user session
    */
@@ -40,7 +72,8 @@ export const authService = {
    * Update in-memory user
    */
   setCurrentUser: (user) => {
-    currentUser = { ...currentUser, ...user };
+    currentUser = user ? { ...currentUser, ...user } : null;
+    notifyAuthChange(currentUser);
     return currentUser;
   },
 
@@ -88,6 +121,7 @@ export const authService = {
       created_at: new Date().toISOString(),
     };
     authToken = "demo-token-" + Date.now();
+    notifyAuthChange(currentUser);
 
     return {
       success: true,
@@ -135,6 +169,7 @@ export const authService = {
       created_at: new Date().toISOString(),
     };
     authToken = "demo-token-" + Date.now();
+    notifyAuthChange(currentUser);
 
     return {
       success: true,
@@ -223,6 +258,16 @@ export const authService = {
    */
   loginAsDemoElderly: async () => {
     await delay(200);
+    currentUser = {
+      id: "usr_demo_101",
+      full_name: "Chathura Rajapakse",
+      email: "chathura.rajapakse@medicare.com",
+      phone: "+94771234567",
+      role: "patient",
+      created_at: new Date().toISOString(),
+    };
+    authToken = "demo-bearer-token-medicare";
+    notifyAuthChange(currentUser);
     return {
       success: true,
       user: currentUser,
@@ -236,6 +281,8 @@ export const authService = {
   logout: async () => {
     await delay(150);
     authToken = null;
+    currentUser = null;
+    notifyAuthChange(null);
     return { success: true };
   },
 };

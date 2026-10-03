@@ -11,6 +11,7 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { profileService } from "../../services/profileService";
 import { authService } from "../../services/authService";
 
@@ -67,7 +68,13 @@ export default function MyProfileScreen({ navigation }) {
         onPress: async () => {
           await authService.logout();
           if (navigation && navigation.navigate) {
-            navigation.navigate("Welcome");
+            try {
+              navigation.navigate("Welcome");
+            } catch (e) {
+              router.replace("/?route=Welcome");
+            }
+          } else {
+            router.replace("/?route=Welcome");
           }
         },
       },

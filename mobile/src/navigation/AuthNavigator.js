@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
+import authService from '../services/authService';
 
 // Import all Member 1 Authentication Screens
 import SplashScreen from '../screens/auth/SplashScreen';
@@ -10,6 +12,10 @@ import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import OtpVerificationScreen from '../screens/auth/OtpVerificationScreen';
 import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 import SuccessScreen from '../screens/auth/SuccessScreen';
+import MyProfileScreen from '../screens/profile/MyProfileScreen';
+import EditProfileScreen from '../screens/profile/EditProfileScreen';
+import SettingsScreen from '../screens/profile/SettingsScreen';
+import AccessibilityScreen from '../screens/profile/AccessibilityScreen';
 
 export {
   SplashScreen,
@@ -20,6 +26,10 @@ export {
   OtpVerificationScreen,
   ResetPasswordScreen,
   SuccessScreen,
+  MyProfileScreen,
+  EditProfileScreen,
+  SettingsScreen,
+  AccessibilityScreen,
 };
 
 // Check if @react-navigation/native-stack is available in environment
@@ -35,11 +45,11 @@ try {
  * Native React Navigation Stack
  * Active when @react-navigation/native-stack is installed in project.
  */
-function NativeAuthNavigator() {
+function NativeAuthNavigator({ initialRoute = 'Splash' }) {
   const Stack = createNativeStackNavigator();
   return (
     <Stack.Navigator
-      initialRouteName="Splash"
+      initialRouteName={initialRoute}
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: '#F1F7F3' },
@@ -54,6 +64,10 @@ function NativeAuthNavigator() {
       <Stack.Screen name="OtpVerification" component={OtpVerificationScreen} />
       <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
       <Stack.Screen name="Success" component={SuccessScreen} />
+      <Stack.Screen name="MyProfile" component={MyProfileScreen} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="Accessibility" component={AccessibilityScreen} />
     </Stack.Navigator>
   );
 }
@@ -66,20 +80,51 @@ function NativeAuthNavigator() {
 function StandaloneAuthNavigator({ initialRoute = 'Splash' }) {
   const [history, setHistory] = useState([{ name: initialRoute, params: {} }]);
 
+  useEffect(() => {
+    if (initialRoute) {
+      setHistory([{ name: initialRoute, params: {} }]);
+    }
+  }, [initialRoute]);
+
   const currentRoute = history[history.length - 1];
+
+  const handleRouteRedirect = (name) => {
+    if (name === '/(patient)/dashboard' || name === '/dashboard' || name === 'Dashboard') {
+      router.replace('/(patient)/dashboard');
+      return true;
+    }
+    if (name === '/(patient)/profile' || name === '/profile') {
+      router.replace('/(patient)/profile');
+      return true;
+    }
+    if (typeof name === 'string' && name.startsWith('/')) {
+      router.replace(name);
+      return true;
+    }
+    return false;
+  };
 
   const navigation = {
     navigate: (name, params = {}) => {
+      if (handleRouteRedirect(name)) return;
       setHistory((prev) => [...prev, { name, params }]);
     },
     goBack: () => {
-      setHistory((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
+      if (history.length > 1) {
+        setHistory((prev) => prev.slice(0, -1));
+      } else {
+        if (authService.isAuthenticated && authService.isAuthenticated()) {
+          router.replace('/(patient)/dashboard');
+        }
+      }
     },
     replace: (name, params = {}) => {
+      if (handleRouteRedirect(name)) return;
       setHistory((prev) => [...prev.slice(0, -1), { name, params }]);
     },
     reset: (state) => {
       const firstRoute = state?.routes?.[0] || { name: 'Login', params: {} };
+      if (handleRouteRedirect(firstRoute.name)) return;
       setHistory([firstRoute]);
     },
   };
@@ -106,6 +151,14 @@ function StandaloneAuthNavigator({ initialRoute = 'Splash' }) {
         return <ResetPasswordScreen navigation={navigation} route={route} />;
       case 'Success':
         return <SuccessScreen navigation={navigation} route={route} />;
+      case 'MyProfile':
+        return <MyProfileScreen navigation={navigation} route={route} />;
+      case 'EditProfile':
+        return <EditProfileScreen navigation={navigation} route={route} />;
+      case 'Settings':
+        return <SettingsScreen navigation={navigation} route={route} />;
+      case 'Accessibility':
+        return <AccessibilityScreen navigation={navigation} route={route} />;
       default:
         return <WelcomeScreen navigation={navigation} route={route} />;
     }
@@ -118,15 +171,15 @@ function StandaloneAuthNavigator({ initialRoute = 'Splash' }) {
  * Primary Export: AuthNavigator
  * Automatically connects to native stack or runs in self-contained mode.
  */
-export default function AuthNavigator(props) {
+export default function AuthNavigator({ initialRoute = 'Splash', ...props }) {
   if (createNativeStackNavigator) {
     try {
-      return <NativeAuthNavigator {...props} />;
+      return <NativeAuthNavigator initialRoute={initialRoute} {...props} />;
     } catch (err) {
-      return <StandaloneAuthNavigator {...props} />;
+      return <StandaloneAuthNavigator initialRoute={initialRoute} {...props} />;
     }
   }
-  return <StandaloneAuthNavigator {...props} />;
+  return <StandaloneAuthNavigator initialRoute={initialRoute} {...props} />;
 }
 
 const styles = StyleSheet.create({
