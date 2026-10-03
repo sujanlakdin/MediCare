@@ -231,14 +231,25 @@ export default function DashboardScreen() {
                     !isTaken && isDue && styles.doseCardDue,
                   ]}
                 >
-                  <View style={styles.doseMainInfo}>
+                  <TouchableOpacity
+                    style={styles.doseMainInfo}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(patient)/medication-detail',
+                        params: { id: medication.id },
+                      } as any)
+                    }
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={`View details for ${medication.name}`}
+                  >
                     <Text style={styles.doseTimePeriod} allowFontScaling={true}>
                       {period} • {formatTime12h(time)}
                     </Text>
                     <Text style={styles.doseMedName} allowFontScaling={true}>
                       {medication.name}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
 
                   {isTaken ? (
                     <View

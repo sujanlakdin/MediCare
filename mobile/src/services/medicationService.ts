@@ -4,19 +4,7 @@ import { useSyncExternalStore } from 'react';
  * Type Medication Definition
  * 
  * TODO: connect real API / database
- * Future database schema (e.g. PostgreSQL / Supabase / MongoDB):
- * Table/Collection: medications
- * Fields:
- * - id: uuid / serial primary key
- * - user_id: uuid (foreign key referencing auth.users)
- * - name: varchar(255) not null
- * - purpose: varchar(255)
- * - form: varchar(50) check (form in ('Tablet', 'Capsule', 'Syrup'))
- * - qty: integer not null default 1
- * - times: text[] or jsonb array of "HH:MM" (24h) strings
- * - repeat: varchar(50) check (repeat in ('Daily', 'Weekly', 'Monthly'))
- * - stock: integer not null default 0
- * - created_at: timestamptz default now()
+ * Future table: id, user_id, name, purpose, form, qty, meal, times, days, repeat, start_date, end_date, stock, alert, created_at
  */
 export interface Medication {
   id: number;
@@ -24,9 +12,14 @@ export interface Medication {
   purpose: string;
   form: 'Tablet' | 'Capsule' | 'Syrup';
   qty: number;
+  meal: string; // 'Before food' | 'After food' | 'With meals' | 'Anytime'
   times: string[]; // "HH:MM" 24h format, e.g. ["08:00", "18:00"]
-  repeat: 'Daily' | 'Weekly' | 'Monthly';
+  days: number[]; // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+  repeat: string; // 'Daily' | 'Weekly' | 'Monthly'
+  start: string; // "YYYY-MM-DD"
+  end: string; // "YYYY-MM-DD"
   stock: number;
+  alert: boolean;
   taken: Record<string, boolean>; // e.g. { '08:00': true }
 }
 
@@ -46,9 +39,14 @@ const INITIAL_MEDICATIONS: Medication[] = [
     purpose: 'Blood pressure',
     form: 'Tablet',
     qty: 1,
+    meal: 'After food',
     times: ['08:00'],
+    days: [0, 1, 2, 3, 4, 5, 6],
     repeat: 'Daily',
+    start: '',
+    end: '',
     stock: 24,
+    alert: true,
     taken: { '08:00': true },
   },
   {
@@ -57,9 +55,14 @@ const INITIAL_MEDICATIONS: Medication[] = [
     purpose: 'Cholesterol',
     form: 'Tablet',
     qty: 1,
+    meal: 'After food',
     times: ['08:00'],
+    days: [0, 1, 2, 3, 4, 5, 6],
     repeat: 'Daily',
+    start: '',
+    end: '',
     stock: 18,
+    alert: true,
     taken: { '08:00': true },
   },
   {
@@ -68,9 +71,14 @@ const INITIAL_MEDICATIONS: Medication[] = [
     purpose: 'Diabetes management',
     form: 'Tablet',
     qty: 1,
+    meal: 'After food',
     times: ['12:30', '18:00'],
+    days: [0, 1, 2, 3, 4, 5, 6],
     repeat: 'Daily',
+    start: '',
+    end: '',
     stock: 6,
+    alert: true,
     taken: {},
   },
   {
@@ -79,9 +87,14 @@ const INITIAL_MEDICATIONS: Medication[] = [
     purpose: 'Blood pressure',
     form: 'Tablet',
     qty: 1,
+    meal: 'After food',
     times: ['21:00'],
+    days: [0, 1, 2, 3, 4, 5, 6],
     repeat: 'Daily',
+    start: '',
+    end: '',
     stock: 30,
+    alert: true,
     taken: {},
   },
 ];
@@ -111,7 +124,7 @@ export function getMedicationsSnapshot(): Medication[] {
 /**
  * useMedications Hook
  * Synchronizes with the module-level reactive store via useSyncExternalStore.
- * Ensures Patient Dashboard and Medication List stay perfectly in sync.
+ * Ensures Patient Dashboard, Medication List, Detail, and Form stay in sync.
  */
 export function useMedications(): Medication[] {
   return useSyncExternalStore(
@@ -147,11 +160,34 @@ export function getCurrentTime24(): string {
   return `${hours}:${minutes}`;
 }
 
-export function getFlattenedDoses(meds: Medication[]): DoseScheduleItem[] {
+export const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+export function formatDaysSummary(days: number[]): string {
+  if (!days || days.length === 0) return 'None';
+  if (days.length === 7) return 'Everyday';
+  return [...days]
+    .sort((a, b) => a - b)
+    .map((d) => DAY_NAMES_SHORT[d])
+    .join(', ');
+}
+
+/**
+ * Get flattened dose list.
+ * If weekday is provided (default today: new Date().getDay()),
+ * strictly filters to medicines scheduled for that weekday.
+ */
+export function getFlattenedDoses(
+  meds: Medication[],
+  weekday = new Date().getDay()
+): DoseScheduleItem[] {
   const now = getCurrentTime24();
   const doses: DoseScheduleItem[] = [];
 
-  for (const med of meds) {
+  const scheduledMeds = meds.filter((m) =>
+    Array.isArray(m.days) ? m.days.includes(weekday) : true
+  );
+
+  for (const med of scheduledMeds) {
     for (const time of med.times) {
       const isTaken = !!med.taken[time];
       const isDue = !isTaken && time <= now;
@@ -176,15 +212,26 @@ export async function listMedications(): Promise<Medication[]> {
   return [...medicationsStore];
 }
 
+export async function getMedication(id: number): Promise<Medication | null> {
+  await delay(100);
+  const found = medicationsStore.find((m) => m.id === id);
+  return found ? { ...found } : null;
+}
+
 export async function addMedication(
   item: Omit<Medication, 'id' | 'taken'> & { taken?: Record<string, boolean> }
 ): Promise<Medication> {
   await delay();
   const newMed: Medication = {
     ...item,
+    meal: item.meal || 'After food',
+    start: item.start || '',
+    end: item.end || '',
+    alert: item.alert !== undefined ? item.alert : true,
     id: ++nextMedicationId,
     taken: item.taken || {},
     times: [...new Set(item.times)].sort(),
+    days: [...new Set(item.days || [0, 1, 2, 3, 4, 5, 6])].sort(),
   };
   medicationsStore = [...medicationsStore, newMed];
   emitChange();
@@ -239,7 +286,7 @@ export async function deleteMedication(id: number): Promise<boolean> {
 }
 
 export async function markDoseTaken(id: number, time: string): Promise<boolean> {
-  await delay(120);
+  await delay(100);
   const index = medicationsStore.findIndex((m) => m.id === id);
   if (index === -1) return false;
 
@@ -259,4 +306,24 @@ export async function markDoseTaken(id: number, time: string): Promise<boolean> 
   ];
   emitChange();
   return true;
+}
+
+export async function toggleRefillAlert(id: number): Promise<boolean> {
+  await delay(80);
+  const index = medicationsStore.findIndex((m) => m.id === id);
+  if (index === -1) return false;
+
+  const current = medicationsStore[index];
+  const updated: Medication = {
+    ...current,
+    alert: !current.alert,
+  };
+
+  medicationsStore = [
+    ...medicationsStore.slice(0, index),
+    updated,
+    ...medicationsStore.slice(index + 1),
+  ];
+  emitChange();
+  return updated.alert;
 }

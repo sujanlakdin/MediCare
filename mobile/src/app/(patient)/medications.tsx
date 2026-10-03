@@ -58,8 +58,8 @@ export default function MedicationsScreen() {
     return matchesQuery && matchesPeriod;
   });
 
-  // Check low stock
-  const lowStockMed = medications.find((m) => m.stock <= 7);
+  // Check low stock when alert is on and stock <= 5
+  const lowStockMed = medications.find((m) => m.alert && m.stock <= 5);
 
   // 2-Tap Delete Handler
   const handleDeletePress = async (id: number, name: string) => {
@@ -75,6 +75,13 @@ export default function MedicationsScreen() {
         setArmedDeleteId(null);
       }, 3000);
     }
+  };
+
+  const handleCardPress = (id: number) => {
+    router.push({
+      pathname: '/(patient)/medication-detail' as any,
+      params: { id: String(id) },
+    });
   };
 
   const handleEditPress = (id: number) => {
@@ -193,31 +200,38 @@ export default function MedicationsScreen() {
 
               return (
                 <View key={med.id} style={styles.medCard}>
-                  {/* Row 1: Name and Active badge */}
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.medName} allowFontScaling={true}>
-                      {med.name}
+                  <TouchableOpacity
+                    onPress={() => handleCardPress(med.id)}
+                    activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityLabel={`View details for ${med.name}`}
+                  >
+                    {/* Row 1: Name and Active badge */}
+                    <View style={styles.cardHeader}>
+                      <Text style={styles.medName} allowFontScaling={true}>
+                        {med.name}
+                      </Text>
+                      <View style={styles.activeBadge}>
+                        <Text style={styles.activeBadgeText} allowFontScaling={true}>
+                          Active
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Purpose */}
+                    <Text style={styles.medPurpose} allowFontScaling={true}>
+                      For {med.purpose || 'general health'}
                     </Text>
-                    <View style={styles.activeBadge}>
-                      <Text style={styles.activeBadgeText} allowFontScaling={true}>
-                        Active
+
+                    {/* Times & Form info */}
+                    <View style={styles.medScheduleRow}>
+                      <PatientIcon name="clock" size={18} color={PATIENT_COLORS.muted} />
+                      <Text style={styles.medScheduleText} allowFontScaling={true}>
+                        {formattedTimes} • {med.qty} {med.form.toLowerCase()}
+                        {med.qty > 1 ? 's' : ''} • {med.meal}
                       </Text>
                     </View>
-                  </View>
-
-                  {/* Purpose */}
-                  <Text style={styles.medPurpose} allowFontScaling={true}>
-                    For {med.purpose || 'general health'}
-                  </Text>
-
-                  {/* Times & Form info */}
-                  <View style={styles.medScheduleRow}>
-                    <PatientIcon name="clock" size={18} color={PATIENT_COLORS.muted} />
-                    <Text style={styles.medScheduleText} allowFontScaling={true}>
-                      {formattedTimes} • {med.qty} {med.form.toLowerCase()}
-                      {med.qty > 1 ? 's' : ''}
-                    </Text>
-                  </View>
+                  </TouchableOpacity>
 
                   {/* Card Footer: Repeat and Actions */}
                   <View style={styles.cardFooter}>

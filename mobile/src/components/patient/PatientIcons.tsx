@@ -16,6 +16,11 @@ const ICON_PATHS: Record<string, string> = {
   clock: 'M12 21a9 9 0 100-18 9 9 0 000 18 M12 7v5l3 2',
   back: 'M15 5l-7 7 7 7',
   check: 'M5 12.5l4.5 4.5L19 7.5',
+  sun: 'M12 17a5 5 0 100-10 5 5 0 000 10 M12 2v2 M12 20v2 M4.9 4.9l1.4 1.4 M17.7 17.7l1.4 1.4 M2 12h2 M20 12h2 M4.9 19.1l1.4-1.4 M17.7 6.3l1.4-1.4',
+  moon: 'M21 13A9 9 0 1111 3a7 7 0 0010 10z',
+  camera: 'M4 8h3l2-3h6l2 3h3v11H4z M12 17a4 4 0 100-8 4 4 0 000 8',
+  cal: 'M4 6h16v14H4z M4 10h16 M8 3v4 M16 3v4',
+  'arrow-left': 'M19 12H5 M12 19l-7-7 7-7',
 };
 
 interface PatientIconProps {

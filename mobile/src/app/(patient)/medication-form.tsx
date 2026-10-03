@@ -4,59 +4,86 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  ScrollView,
   ActivityIndicator,
   StyleSheet,
+  Switch,
   Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import SafeScreen from '../../components/auth/SafeScreen';
 import Toast from '../../components/auth/Toast';
+import PatientIcon from '../../components/patient/PatientIcons';
 import { PATIENT_COLORS } from '../../constants/patientTheme';
 import {
   useMedications,
   addMedication,
   updateMedication,
   deleteMedication,
+  getTimePeriod,
+  formatDaysSummary,
+  DAY_NAMES_SHORT,
+  Medication,
 } from '../../services/medicationService';
-import PatientIcon from '../../components/patient/PatientIcons';
 
 type FormType = 'Tablet' | 'Capsule' | 'Syrup';
+type MealType = 'Before food' | 'After food' | 'With meals' | 'Anytime';
 type RepeatType = 'Daily' | 'Weekly' | 'Monthly';
 
 const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+const FORM_SUBTITLES: Record<FormType, string> = {
+  Tablet: 'Solid pill',
+  Capsule: 'Gel shell',
+  Syrup: 'Liquid/Drop',
+};
 
 export default function MedicationFormScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string }>();
   const medications = useMedications();
-  const editId = id ? Number(id) : null;
+  const editId = params.id ? Number(params.id) : null;
   const isEditing = !!editId;
 
-  // Form states
+  // Form Fields State
   const [name, setName] = useState('');
   const [purpose, setPurpose] = useState('');
   const [form, setForm] = useState<FormType>('Tablet');
   const [qty, setQty] = useState(1);
+  const [meal, setMeal] = useState<MealType>('After food');
   const [times, setTimes] = useState<string[]>(['08:00']);
+  const [days, setDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
   const [repeat, setRepeat] = useState<RepeatType>('Daily');
+  const [start, setStart] = useState('');
+  const [end, setEnd] = useState('');
   const [stock, setStock] = useState('30');
+  const [alert, setAlert] = useState(true);
 
-  // Error states
+  // Validation Error States
   const [nameError, setNameError] = useState('');
   const [timeError, setTimeError] = useState('');
+  const [daysError, setDaysError] = useState('');
+  const [durationError, setDurationError] = useState('');
 
-  // UI state
+  // UI States
   const [loading, setLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const [isArmedDelete, setIsArmedDelete] = useState(false);
   const armTimerRef = useRef<any>(null);
 
+  useEffect(() => {
+    return () => {
+      if (armTimerRef.current) clearTimeout(armTimerRef.current);
+    };
+  }, []);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setToastVisible(true);
   };
 
-  // Pre-fill if editing
+  // Pre-fill fields if editing an existing medication
   useEffect(() => {
     if (editId) {
       const existing = medications.find((m) => m.id === editId);
@@ -64,18 +91,26 @@ export default function MedicationFormScreen() {
         setName(existing.name);
         setPurpose(existing.purpose || '');
         setForm(existing.form);
-        setQty(existing.qty);
-        setTimes(existing.times.length > 0 ? existing.times : ['08:00']);
-        setRepeat(existing.repeat);
-        setStock(String(existing.stock));
+        setQty(existing.qty || 1);
+        setMeal((existing.meal as MealType) || 'After food');
+        setTimes(existing.times && existing.times.length > 0 ? existing.times : ['08:00']);
+        setDays(Array.isArray(existing.days) && existing.days.length > 0 ? existing.days : [0, 1, 2, 3, 4, 5, 6]);
+        setRepeat((existing.repeat as RepeatType) || 'Daily');
+        setStart(existing.start || '');
+        setEnd(existing.end || '');
+        setStock(String(existing.stock ?? 30));
+        setAlert(existing.alert !== undefined ? existing.alert : true);
       }
     }
   }, [editId, medications]);
 
-  // Clean errors on input
   const handleNameChange = (text: string) => {
     setName(text);
     if (nameError) setNameError('');
+  };
+
+  const handleQtyChange = (delta: number) => {
+    setQty((prev) => Math.min(10, Math.max(1, prev + delta)));
   };
 
   const handleTimeChange = (index: number, val: string) => {
@@ -86,7 +121,7 @@ export default function MedicationFormScreen() {
   };
 
   const handleAddTime = () => {
-    const defaultTime = times.length === 1 ? '18:00' : '12:00';
+    const defaultTime = times.length === 1 ? '18:00' : times.length === 2 ? '12:00' : '20:00';
     setTimes([...times, defaultTime]);
     if (timeError) setTimeError('');
   };
@@ -97,14 +132,21 @@ export default function MedicationFormScreen() {
     setTimes(updated);
   };
 
-  const handleQtyChange = (delta: number) => {
-    setQty((prev) => Math.min(10, Math.max(1, prev + delta)));
+  const handleToggleDay = (dayIndex: number) => {
+    setDays((prev) => {
+      const updated = prev.includes(dayIndex)
+        ? prev.filter((d) => d !== dayIndex)
+        : [...prev, dayIndex].sort((a, b) => a - b);
+      if (updated.length > 0 && daysError) setDaysError('');
+      return updated;
+    });
   };
 
   const validate = (): boolean => {
     let isValid = true;
-    const cleanName = name.trim();
 
+    // 1. Medicine Name
+    const cleanName = name.trim();
     if (!cleanName) {
       setNameError('Enter the medicine name.');
       isValid = false;
@@ -112,6 +154,7 @@ export default function MedicationFormScreen() {
       setNameError('');
     }
 
+    // 2. Intake Times
     const validTimes = times.map((t) => t.trim()).filter(Boolean);
     if (validTimes.length === 0) {
       setTimeError('Add at least one reminder time.');
@@ -119,11 +162,29 @@ export default function MedicationFormScreen() {
     } else {
       const hasInvalidFormat = validTimes.some((t) => !TIME_REGEX.test(t));
       if (hasInvalidFormat) {
-        setTimeError('Times must be in 24-hour HH:MM format (e.g. 08:00 or 18:30).');
+        setTimeError('Times must be in 24-hour format (e.g. 08:00, 18:30).');
         isValid = false;
       } else {
         setTimeError('');
       }
+    }
+
+    // 3. Days of Week
+    if (days.length === 0) {
+      setDaysError('Pick at least one day.');
+      isValid = false;
+    } else {
+      setDaysError('');
+    }
+
+    // 4. Treatment Duration (Optional, but end must be on or after start)
+    const cleanStart = start.trim();
+    const cleanEnd = end.trim();
+    if (cleanStart && cleanEnd && cleanEnd < cleanStart) {
+      setDurationError('End date must be on or after the start date.');
+      isValid = false;
+    } else {
+      setDurationError('');
     }
 
     return isValid;
@@ -146,27 +207,39 @@ export default function MedicationFormScreen() {
           purpose: purpose.trim(),
           form,
           qty,
+          meal,
           times: cleanTimes,
+          days,
           repeat,
+          start: start.trim(),
+          end: end.trim(),
           stock: stockNumber,
+          alert,
         });
         showToast('Medication updated');
+        setTimeout(() => {
+          router.back();
+        }, 350);
       } else {
         await addMedication({
           name: name.trim(),
           purpose: purpose.trim(),
           form,
           qty,
+          meal,
           times: cleanTimes,
+          days,
           repeat,
+          start: start.trim(),
+          end: end.trim(),
           stock: stockNumber,
+          alert,
         });
         showToast('Medication added');
+        setTimeout(() => {
+          router.replace('/(patient)/medications' as any);
+        }, 350);
       }
-
-      setTimeout(() => {
-        router.back();
-      }, 350);
     } catch (e: any) {
       showToast(e.message || 'Error saving medication');
     } finally {
@@ -198,6 +271,8 @@ export default function MedicationFormScreen() {
     }
   };
 
+  const unitLabel = form === 'Syrup' ? 'Dose' : form;
+
   return (
     <View style={styles.outerContainer}>
       <SafeScreen
@@ -206,7 +281,10 @@ export default function MedicationFormScreen() {
         barStyle="dark-content"
         contentContainerStyle={styles.safeContent}
       >
-        <View style={styles.mainContent}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
           {/* Header Row */}
           <View style={styles.headerRow}>
             <TouchableOpacity
@@ -214,14 +292,14 @@ export default function MedicationFormScreen() {
               onPress={() => router.back()}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel="Back to medications"
+              accessibilityLabel="Back"
             >
-              <PatientIcon name="back" size={22} color={PATIENT_COLORS.text} />
+              <PatientIcon name="back" size={20} color={PATIENT_COLORS.deep} strokeWidth={2.4} />
             </TouchableOpacity>
 
             <View style={styles.headerTitles}>
               <Text style={styles.title} allowFontScaling={true}>
-                {isEditing ? 'Edit Medication' : 'Add Medication'}
+                {isEditing ? 'Edit Medicine' : 'Add Medicine Details'}
               </Text>
               <Text style={styles.subTitle} allowFontScaling={true}>
                 {isEditing
@@ -231,8 +309,24 @@ export default function MedicationFormScreen() {
             </View>
           </View>
 
-          {/* Form Fields */}
-          {/* 1. Medicine Name */}
+          {/* Photo Box (UI Only) */}
+          <TouchableOpacity
+            style={styles.photoBox}
+            onPress={() => showToast('Photo & prescription scanner will be added later')}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Tap to add or change medication photo"
+          >
+            <PatientIcon name="camera" size={32} color={PATIENT_COLORS.brand} strokeWidth={2} />
+            <Text style={styles.photoBoxTitle} allowFontScaling={true}>
+              Tap to {isEditing ? 'retake / change' : 'add'} photo
+            </Text>
+            <Text style={styles.photoBoxSub} allowFontScaling={true}>
+              Supports AI pill & prescription scanner
+            </Text>
+          </TouchableOpacity>
+
+          {/* 1. Medicine Name (Required) */}
           <Text style={styles.fieldLabel} allowFontScaling={true}>
             Medicine name
           </Text>
@@ -265,43 +359,57 @@ export default function MedicationFormScreen() {
             allowFontScaling={true}
           />
 
-          {/* 3. Form (Segmented Control) */}
+          {/* 3. Form of Medicine (3 Cards: Tablet, Capsule, Syrup) */}
           <Text style={styles.fieldLabel} allowFontScaling={true}>
-            Form
+            Form of medicine
           </Text>
-          <View style={styles.segmentedRow} accessibilityRole="radiogroup">
+          <View style={styles.formCardsRow} accessibilityRole="radiogroup">
             {(['Tablet', 'Capsule', 'Syrup'] as FormType[]).map((f) => {
               const isSelected = form === f;
               return (
                 <TouchableOpacity
                   key={f}
                   style={[
-                    styles.segmentButton,
-                    isSelected && styles.segmentButtonActive,
+                    styles.formCard,
+                    isSelected && styles.formCardActive,
                   ]}
                   onPress={() => setForm(f)}
                   activeOpacity={0.75}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: isSelected }}
-                  accessibilityLabel={f}
+                  accessibilityLabel={`${f}, ${FORM_SUBTITLES[f]}`}
                 >
+                  {isSelected && (
+                    <View style={styles.formCardCheck}>
+                      <PatientIcon name="check" size={14} color={PATIENT_COLORS.white} strokeWidth={2.8} />
+                    </View>
+                  )}
                   <Text
                     style={[
-                      styles.segmentText,
-                      isSelected && styles.segmentTextActive,
+                      styles.formCardTitle,
+                      isSelected && styles.formCardTitleActive,
                     ]}
                     allowFontScaling={true}
                   >
                     {f}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.formCardSub,
+                      isSelected && styles.formCardSubActive,
+                    ]}
+                    allowFontScaling={true}
+                  >
+                    {FORM_SUBTITLES[f]}
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
 
-          {/* 4. Dose Stepper */}
+          {/* 4. Dosage Stepper (1-10) */}
           <Text style={styles.fieldLabel} allowFontScaling={true}>
-            Dose per intake
+            Dosage per intake
           </Text>
           <View style={styles.stepperContainer}>
             <TouchableOpacity
@@ -316,12 +424,12 @@ export default function MedicationFormScreen() {
                 name="minus"
                 size={22}
                 color={qty <= 1 ? PATIENT_COLORS.muted : PATIENT_COLORS.brand}
+                strokeWidth={2.4}
               />
             </TouchableOpacity>
 
             <Text style={styles.stepperValueText} allowFontScaling={true}>
-              {qty} {form}
-              {qty > 1 ? 's' : ''}
+              {qty} {unitLabel}{qty > 1 ? 's' : ''}
             </Text>
 
             <TouchableOpacity
@@ -336,87 +444,165 @@ export default function MedicationFormScreen() {
                 name="plus"
                 size={22}
                 color={qty >= 10 ? PATIENT_COLORS.muted : PATIENT_COLORS.brand}
+                strokeWidth={2.4}
               />
             </TouchableOpacity>
           </View>
 
-          {/* 5. Reminder Times */}
+          {/* 5. Take / Meal Timing */}
           <Text style={styles.fieldLabel} allowFontScaling={true}>
-            Reminder times
+            Take
           </Text>
-          {times.map((t, idx) => (
-            <View key={idx} style={styles.timeRow}>
-              {Platform.OS === 'web' ? (
-                // Web native time picker input
-                <input
-                  type="time"
-                  value={t}
-                  onChange={(e: any) => handleTimeChange(idx, e.target.value)}
-                  style={{
-                    flex: 1,
-                    height: 56,
-                    padding: '0 16px',
-                    border: '1.5px solid #E2E8F0',
-                    borderRadius: 18,
-                    backgroundColor: '#FFFFFF',
-                    fontSize: 16,
-                    fontFamily: 'inherit',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                  }}
-                  aria-label={`Reminder time ${idx + 1}`}
-                />
-              ) : (
-                <TextInput
-                  style={[styles.input, styles.timeInput]}
-                  value={t}
-                  onChangeText={(val) => handleTimeChange(idx, val)}
-                  placeholder="HH:MM (e.g. 08:00)"
-                  placeholderTextColor={PATIENT_COLORS.ph}
-                  maxLength={5}
-                  accessibilityLabel={`Reminder time ${idx + 1}`}
-                  allowFontScaling={true}
-                />
-              )}
-
-              {times.length > 1 && (
+          <View style={styles.segmentedRow} accessibilityRole="radiogroup">
+            {(['Before food', 'After food', 'With meals', 'Anytime'] as MealType[]).map((m) => {
+              const isSelected = meal === m;
+              return (
                 <TouchableOpacity
-                  style={styles.removeTimeButton}
-                  onPress={() => handleRemoveTime(idx)}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Remove reminder time ${idx + 1}`}
+                  key={m}
+                  style={[
+                    styles.segmentButtonSm,
+                    isSelected && styles.segmentButtonActive,
+                  ]}
+                  onPress={() => setMeal(m)}
+                  activeOpacity={0.75}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={`Take ${m}`}
                 >
-                  <PatientIcon
-                    name="trash"
-                    size={20}
-                    color={PATIENT_COLORS.danger}
-                  />
+                  <Text
+                    style={[
+                      styles.segmentTextSm,
+                      isSelected && styles.segmentTextActive,
+                    ]}
+                    allowFontScaling={true}
+                    numberOfLines={1}
+                  >
+                    {m}
+                  </Text>
                 </TouchableOpacity>
-              )}
-            </View>
-          ))}
+              );
+            })}
+          </View>
+
+          {/* 6. Intake Time & Schedule */}
+          <Text style={styles.fieldLabel} allowFontScaling={true}>
+            Intake time & schedule
+          </Text>
+          {times.map((t, idx) => {
+            const period = getTimePeriod(t);
+            return (
+              <View key={idx} style={styles.timeRow}>
+                {Platform.OS === 'web' ? (
+                  <input
+                    type="time"
+                    value={t}
+                    onChange={(e: any) => handleTimeChange(idx, e.target.value)}
+                    style={{
+                      flex: 1,
+                      height: 56,
+                      padding: '0 16px',
+                      border: '1.5px solid #E2E8F0',
+                      borderRadius: 18,
+                      backgroundColor: '#FFFFFF',
+                      fontSize: 16,
+                      fontFamily: 'inherit',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                    aria-label={`Reminder time ${idx + 1}`}
+                  />
+                ) : (
+                  <TextInput
+                    style={[styles.input, styles.timeInput]}
+                    value={t}
+                    onChangeText={(val) => handleTimeChange(idx, val)}
+                    placeholder="HH:MM (e.g. 08:00)"
+                    placeholderTextColor={PATIENT_COLORS.ph}
+                    maxLength={5}
+                    accessibilityLabel={`Reminder time ${idx + 1}`}
+                    allowFontScaling={true}
+                  />
+                )}
+
+                <View style={styles.periodChip}>
+                  <Text style={styles.periodChipText} allowFontScaling={true}>
+                    {period}
+                  </Text>
+                </View>
+
+                {times.length > 1 && (
+                  <TouchableOpacity
+                    style={styles.removeTimeButton}
+                    onPress={() => handleRemoveTime(idx)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove reminder time ${idx + 1}`}
+                  >
+                    <PatientIcon
+                      name="trash"
+                      size={20}
+                      color={PATIENT_COLORS.danger}
+                      strokeWidth={2}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })}
           {!!timeError && (
             <Text style={styles.errorText} allowFontScaling={true}>
               {timeError}
             </Text>
           )}
 
-          {/* Add Another Time Button */}
+          {/* Add Another Intake Time Button */}
           <TouchableOpacity
             style={styles.addTimeDashedBtn}
             onPress={handleAddTime}
             activeOpacity={0.75}
             accessibilityRole="button"
-            accessibilityLabel="Add another reminder time"
+            accessibilityLabel="Add another intake time"
           >
             <Text style={styles.addTimeDashedText} allowFontScaling={true}>
-              + Add another time
+              + Add another intake time
             </Text>
           </TouchableOpacity>
 
-          {/* 6. Repeat (Segmented Control) */}
+          {/* 7. Days of Week */}
           <Text style={styles.fieldLabel} allowFontScaling={true}>
+            Days of week • {formatDaysSummary(days)}
+          </Text>
+          <View style={styles.daysRow} accessibilityRole="toolbar">
+            {DAY_NAMES_SHORT.map((dayName, idx) => {
+              const isSelected = days.includes(idx);
+              return (
+                <TouchableOpacity
+                  key={dayName}
+                  style={[styles.dayButton, isSelected && styles.dayButtonActive]}
+                  onPress={() => handleToggleDay(idx)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={`${dayName} toggle`}
+                >
+                  <Text
+                    style={[styles.dayButtonText, isSelected && styles.dayButtonTextActive]}
+                    allowFontScaling={true}
+                  >
+                    {dayName}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {!!daysError && (
+            <Text style={styles.errorText} allowFontScaling={true}>
+              {daysError}
+            </Text>
+          )}
+
+          {/* 8. Repeat Frequency */}
+          <Text style={[styles.fieldLabel, { marginTop: 14 }]} allowFontScaling={true}>
             Repeat
           </Text>
           <View style={styles.segmentedRow} accessibilityRole="radiogroup">
@@ -449,41 +635,145 @@ export default function MedicationFormScreen() {
             })}
           </View>
 
-          {/* 7. Pills in Stock */}
+          {/* 9. Treatment Duration (Optional) */}
           <Text style={styles.fieldLabel} allowFontScaling={true}>
-            Pills in stock (refill alert at 7)
+            Treatment duration (optional)
+          </Text>
+          <View style={styles.durationRow}>
+            <View style={{ flex: 1 }}>
+              {Platform.OS === 'web' ? (
+                <input
+                  type="date"
+                  value={start}
+                  onChange={(e: any) => {
+                    setStart(e.target.value);
+                    if (durationError) setDurationError('');
+                  }}
+                  style={{
+                    width: '100%',
+                    height: 56,
+                    padding: '0 14px',
+                    border: '1.5px solid #E2E8F0',
+                    borderRadius: 18,
+                    backgroundColor: '#FFFFFF',
+                    fontSize: 15,
+                    fontFamily: 'inherit',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                  aria-label="Start date"
+                />
+              ) : (
+                <TextInput
+                  style={styles.input}
+                  placeholder="Start (YYYY-MM-DD)"
+                  placeholderTextColor={PATIENT_COLORS.ph}
+                  value={start}
+                  onChangeText={(val) => {
+                    setStart(val);
+                    if (durationError) setDurationError('');
+                  }}
+                  accessibilityLabel="Start date"
+                  allowFontScaling={true}
+                />
+              )}
+            </View>
+
+            <View style={{ flex: 1 }}>
+              {Platform.OS === 'web' ? (
+                <input
+                  type="date"
+                  value={end}
+                  onChange={(e: any) => {
+                    setEnd(e.target.value);
+                    if (durationError) setDurationError('');
+                  }}
+                  style={{
+                    width: '100%',
+                    height: 56,
+                    padding: '0 14px',
+                    border: '1.5px solid #E2E8F0',
+                    borderRadius: 18,
+                    backgroundColor: '#FFFFFF',
+                    fontSize: 15,
+                    fontFamily: 'inherit',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                  aria-label="End date"
+                />
+              ) : (
+                <TextInput
+                  style={styles.input}
+                  placeholder="End (YYYY-MM-DD)"
+                  placeholderTextColor={PATIENT_COLORS.ph}
+                  value={end}
+                  onChangeText={(val) => {
+                    setEnd(val);
+                    if (durationError) setDurationError('');
+                  }}
+                  accessibilityLabel="End date"
+                  allowFontScaling={true}
+                />
+              )}
+            </View>
+          </View>
+          {!!durationError && (
+            <Text style={styles.errorText} allowFontScaling={true}>
+              {durationError}
+            </Text>
+          )}
+
+          {/* 10. Pills in Stock */}
+          <Text style={styles.fieldLabel} allowFontScaling={true}>
+            Pills in stock
           </Text>
           <TextInput
             style={styles.input}
-            value={stock}
-            onChangeText={setStock}
             keyboardType="numeric"
             placeholder="e.g. 30"
             placeholderTextColor={PATIENT_COLORS.ph}
+            value={stock}
+            onChangeText={setStock}
             accessibilityLabel="Pills in stock"
             allowFontScaling={true}
           />
 
-          {/* Save / Update Button */}
+          {/* 11. Refill Low-Supply Alert Switch */}
+          <View style={styles.switchCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.switchTitle} allowFontScaling={true}>
+                Refill low-supply alert
+              </Text>
+              <Text style={styles.switchSub} allowFontScaling={true}>
+                Remind me when 5 pills remaining
+              </Text>
+            </View>
+            <Switch
+              value={alert}
+              onValueChange={setAlert}
+              trackColor={{ false: '#CBD5D1', true: PATIENT_COLORS.accent }}
+              thumbColor={PATIENT_COLORS.white}
+              accessibilityRole="switch"
+              accessibilityLabel="Refill low-supply alert switch"
+              accessibilityState={{ checked: alert }}
+            />
+          </View>
+
+          {/* 12. Submit Button */}
           <TouchableOpacity
-            style={[styles.saveButton, loading && styles.buttonDisabled]}
+            style={styles.saveButton}
             onPress={handleSave}
             disabled={loading}
             activeOpacity={0.85}
             accessibilityRole="button"
             accessibilityLabel={isEditing ? 'Update Changes' : 'Save Medication'}
-            accessibilityState={{ busy: loading }}
           >
             {loading ? (
-              <ActivityIndicator size="small" color={PATIENT_COLORS.white} />
+              <ActivityIndicator color={PATIENT_COLORS.white} />
             ) : (
               <>
-                <PatientIcon
-                  name="check"
-                  size={22}
-                  color={PATIENT_COLORS.white}
-                  strokeWidth={2.4}
-                />
+                <PatientIcon name="check" size={22} color={PATIENT_COLORS.white} strokeWidth={2.6} />
                 <Text style={styles.saveButtonText} allowFontScaling={true}>
                   {isEditing ? 'Update Changes' : 'Save Medication'}
                 </Text>
@@ -491,7 +781,7 @@ export default function MedicationFormScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Delete Button (Edit Mode Only) */}
+          {/* 13. Delete Button (Edit mode only, 2-tap confirm) */}
           {isEditing && (
             <TouchableOpacity
               style={[
@@ -499,7 +789,7 @@ export default function MedicationFormScreen() {
                 isArmedDelete && styles.deleteButtonArmed,
               ]}
               onPress={handleDelete}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
               accessibilityRole="button"
               accessibilityLabel={
                 isArmedDelete ? 'Tap again to delete' : 'Delete Medicine'
@@ -507,10 +797,9 @@ export default function MedicationFormScreen() {
             >
               <PatientIcon
                 name="trash"
-                size={20}
-                color={
-                  isArmedDelete ? PATIENT_COLORS.white : PATIENT_COLORS.danger
-                }
+                size={22}
+                color={isArmedDelete ? PATIENT_COLORS.white : PATIENT_COLORS.danger}
+                strokeWidth={2.2}
               />
               <Text
                 style={[
@@ -523,10 +812,9 @@ export default function MedicationFormScreen() {
               </Text>
             </TouchableOpacity>
           )}
-        </View>
+        </ScrollView>
       </SafeScreen>
 
-      {/* Toast Notification */}
       <Toast
         visible={toastVisible}
         message={toastMessage}
@@ -545,17 +833,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   safeContent: {
-    paddingBottom: 40,
+    paddingBottom: 24,
   },
-  mainContent: {
+  scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 12,
+    paddingBottom: 40,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   backButton: {
     width: 48,
@@ -582,6 +871,29 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: '500',
   },
+  photoBox: {
+    width: '100%',
+    minHeight: 120,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#9ED8C0',
+    borderRadius: 24,
+    backgroundColor: '#F3FAF6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 18,
+    marginBottom: 16,
+  },
+  photoBoxTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: PATIENT_COLORS.brand,
+  },
+  photoBoxSub: {
+    fontSize: 13,
+    color: PATIENT_COLORS.muted,
+  },
   fieldLabel: {
     fontSize: 13,
     fontWeight: '700',
@@ -592,16 +904,15 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   input: {
-    width: '100%',
     height: 56,
-    paddingHorizontal: 16,
     borderWidth: 1.5,
     borderColor: PATIENT_COLORS.border,
     borderRadius: 18,
     backgroundColor: PATIENT_COLORS.surface,
+    paddingHorizontal: 16,
     fontSize: 16,
-    fontWeight: '500',
     color: PATIENT_COLORS.text,
+    fontWeight: '500',
     marginBottom: 14,
   },
   inputError: {
@@ -609,41 +920,54 @@ const styles = StyleSheet.create({
     backgroundColor: PATIENT_COLORS.dangerBg,
   },
   errorText: {
-    color: PATIENT_COLORS.danger,
     fontSize: 14,
+    color: PATIENT_COLORS.danger,
     fontWeight: '600',
     marginTop: -8,
-    marginHorizontal: 6,
     marginBottom: 12,
+    marginHorizontal: 6,
   },
-  segmentedRow: {
+  formCardsRow: {
     flexDirection: 'row',
-    gap: 6,
-    padding: 5,
-    backgroundColor: PATIENT_COLORS.surface,
-    borderWidth: 1,
-    borderColor: PATIENT_COLORS.border,
-    borderRadius: 20,
+    gap: 8,
     marginBottom: 14,
   },
-  segmentButton: {
+  formCard: {
     flex: 1,
-    minHeight: 48,
-    borderRadius: 16,
+    minHeight: 84,
+    borderWidth: 1.5,
+    borderColor: PATIENT_COLORS.border,
+    backgroundColor: PATIENT_COLORS.surface,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 2,
+    position: 'relative',
+    paddingVertical: 10,
   },
-  segmentButtonActive: {
+  formCardActive: {
     backgroundColor: PATIENT_COLORS.brand,
+    borderColor: PATIENT_COLORS.brand,
   },
-  segmentText: {
-    fontWeight: '600',
-    fontSize: 15,
+  formCardCheck: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+  },
+  formCardTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: PATIENT_COLORS.text,
+  },
+  formCardTitleActive: {
+    color: PATIENT_COLORS.white,
+  },
+  formCardSub: {
+    fontSize: 12,
     color: PATIENT_COLORS.muted,
   },
-  segmentTextActive: {
-    color: PATIENT_COLORS.white,
-    fontWeight: '700',
+  formCardSubActive: {
+    color: '#D6EFE5',
   },
   stepperContainer: {
     flexDirection: 'row',
@@ -654,7 +978,7 @@ const styles = StyleSheet.create({
     borderColor: PATIENT_COLORS.border,
     borderRadius: 20,
     paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     marginBottom: 14,
   },
   stepperButton: {
@@ -668,17 +992,70 @@ const styles = StyleSheet.create({
   stepperValueText: {
     fontSize: 17,
     fontWeight: '700',
-    color: PATIENT_COLORS.text,
+    color: PATIENT_COLORS.deep,
+  },
+  segmentedRow: {
+    flexDirection: 'row',
+    gap: 6,
+    backgroundColor: PATIENT_COLORS.surface,
+    borderWidth: 1,
+    borderColor: PATIENT_COLORS.border,
+    borderRadius: 20,
+    padding: 5,
+    marginBottom: 14,
+  },
+  segmentButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentButtonSm: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  segmentButtonActive: {
+    backgroundColor: PATIENT_COLORS.brand,
+  },
+  segmentText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: PATIENT_COLORS.muted,
+  },
+  segmentTextSm: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: PATIENT_COLORS.muted,
+  },
+  segmentTextActive: {
+    color: PATIENT_COLORS.white,
+    fontWeight: '700',
   },
   timeRow: {
     flexDirection: 'row',
-    gap: 8,
     alignItems: 'center',
+    gap: 8,
     marginBottom: 10,
   },
   timeInput: {
     flex: 1,
     marginBottom: 0,
+  },
+  periodChip: {
+    backgroundColor: PATIENT_COLORS.mint,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  periodChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: PATIENT_COLORS.brand,
   },
   removeTimeButton: {
     width: 48,
@@ -693,9 +1070,9 @@ const styles = StyleSheet.create({
     minHeight: 50,
     borderWidth: 2,
     borderStyle: 'dashed',
-    borderColor: PATIENT_COLORS.addTimeBorder,
+    borderColor: '#9ED8C0',
     borderRadius: 18,
-    backgroundColor: PATIENT_COLORS.addTimeBg,
+    backgroundColor: '#F6FBF8',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
@@ -703,7 +1080,61 @@ const styles = StyleSheet.create({
   addTimeDashedText: {
     color: PATIENT_COLORS.brand,
     fontWeight: '700',
+    fontSize: 15,
+  },
+  daysRow: {
+    flexDirection: 'row',
+    gap: 5,
+    marginBottom: 6,
+  },
+  dayButton: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 14,
+    backgroundColor: PATIENT_COLORS.surface,
+    borderWidth: 1.5,
+    borderColor: PATIENT_COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayButtonActive: {
+    backgroundColor: PATIENT_COLORS.brand,
+    borderColor: PATIENT_COLORS.brand,
+  },
+  dayButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: PATIENT_COLORS.muted,
+  },
+  dayButtonTextActive: {
+    color: PATIENT_COLORS.white,
+  },
+  durationRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  switchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: PATIENT_COLORS.surface,
+    borderWidth: 1,
+    borderColor: PATIENT_COLORS.border,
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 16,
+    gap: 12,
+  },
+  switchTitle: {
     fontSize: 16,
+    fontWeight: '800',
+    color: PATIENT_COLORS.deep,
+  },
+  switchSub: {
+    fontSize: 13,
+    color: PATIENT_COLORS.muted,
+    marginTop: 2,
   },
   saveButton: {
     width: '100%',
@@ -714,39 +1145,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 8,
     shadowColor: PATIENT_COLORS.brand,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.28,
-    shadowRadius: 18,
+    shadowRadius: 24,
     elevation: 6,
+    marginBottom: 12,
   },
   saveButtonText: {
     color: PATIENT_COLORS.white,
     fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
   },
   deleteButton: {
     width: '100%',
-    height: 56,
+    height: 58,
     borderRadius: 999,
     backgroundColor: PATIENT_COLORS.dangerBg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 12,
   },
   deleteButtonArmed: {
     backgroundColor: PATIENT_COLORS.danger,
   },
   deleteButtonText: {
     color: PATIENT_COLORS.danger,
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
   },
   deleteButtonTextArmed: {

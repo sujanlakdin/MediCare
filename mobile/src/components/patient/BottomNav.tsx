@@ -7,7 +7,7 @@ import PatientIcon from './PatientIcons';
 export type PatientTabName = 'dashboard' | 'medications' | 'reminders' | 'adherence' | 'profile';
 
 interface BottomNavProps {
-  currentTab: 'dashboard' | 'medications' | 'profile';
+  currentTab?: PatientTabName;
   onShowToast?: (message: string) => void;
 }
 
@@ -23,7 +23,7 @@ const NAV_ITEMS: NavItemDef[] = [
   { key: 'medications', label: 'Medications', icon: 'pill', route: '/(patient)/medications' },
   { key: 'reminders', label: 'Reminders', icon: 'bell' },
   { key: 'adherence', label: 'Adherence', icon: 'chart' },
-  { key: 'profile', label: 'Profile', icon: 'user', route: '/(patient)/profile' },
+  { key: 'profile', label: 'Profile', icon: 'user' },
 ];
 
 /**
