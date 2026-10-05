@@ -1,7 +1,15 @@
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const dns = require("dns");
 require("dotenv").config();
+
+// Ensure reliable DNS SRV resolution for MongoDB Atlas on Windows networks
+try {
+  dns.setServers(["8.8.8.8", "1.1.1.1"]);
+} catch {
+  // Use default system resolvers if unavailable
+}
 const authRoutes = require("./src/routes/auth");
 const userRoutes = require("./src/routes/users");
 const caregiverRoutes = require("./src/routes/caregivers");
