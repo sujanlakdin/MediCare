@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
+  Image,
   Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -194,16 +195,28 @@ export default function MedicationDetailScreen() {
 
           {/* Hero Card with Pill Illustration & Strength Badge */}
           <View style={styles.heroCard}>
-            <View style={styles.pillArtContainer} accessible={true} accessibilityLabel="Pill graphic">
-              <View style={styles.pillArtGroove} />
-              {strengthMatch ? (
-                <View style={styles.strengthBadge}>
-                  <Text style={styles.strengthBadgeText} allowFontScaling={true}>
-                    {strengthMatch}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
+            {medication.image ? (
+              <View style={styles.heroImageContainer}>
+                <Image
+                  source={{ uri: medication.image }}
+                  style={styles.heroImage}
+                  resizeMode="cover"
+                  accessibilityRole="image"
+                  accessibilityLabel={`Photograph of ${medication.name}`}
+                />
+              </View>
+            ) : (
+              <View style={styles.pillArtContainer} accessible={true} accessibilityLabel="Pill graphic">
+                <View style={styles.pillArtGroove} />
+                {strengthMatch ? (
+                  <View style={styles.strengthBadge}>
+                    <Text style={styles.strengthBadgeText} allowFontScaling={true}>
+                      {strengthMatch}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
             <Text style={styles.heroName} allowFontScaling={true}>
               {medication.name}
             </Text>
@@ -486,6 +499,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 14,
     elevation: 2,
+  },
+  heroImageContainer: {
+    width: '100%',
+    height: 200,
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginBottom: 18,
+    backgroundColor: '#E4F5EC',
+  },
+  heroImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 24,
   },
   pillArtContainer: {
     width: 160,

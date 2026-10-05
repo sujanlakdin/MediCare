@@ -14,6 +14,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import SafeScreen from '../../components/auth/SafeScreen';
 import Toast from '../../components/auth/Toast';
 import PatientIcon from '../../components/patient/PatientIcons';
+import MedicationImagePicker from '../../components/patient/MedicationImagePicker';
 import { PATIENT_COLORS } from '../../constants/patientTheme';
 import {
   useMedications,
@@ -58,6 +59,7 @@ export default function MedicationFormScreen() {
   const [end, setEnd] = useState('');
   const [stock, setStock] = useState('30');
   const [alert, setAlert] = useState(true);
+  const [image, setImage] = useState<string | undefined>(undefined);
 
   // Validation Error States
   const [nameError, setNameError] = useState('');
@@ -100,6 +102,7 @@ export default function MedicationFormScreen() {
         setEnd(existing.end || '');
         setStock(String(existing.stock ?? 30));
         setAlert(existing.alert !== undefined ? existing.alert : true);
+        setImage(existing.image);
       }
     }
   }, [editId, medications]);
@@ -215,6 +218,7 @@ export default function MedicationFormScreen() {
           end: end.trim(),
           stock: stockNumber,
           alert,
+          image,
         });
         showToast('Medication updated');
         setTimeout(() => {
@@ -234,6 +238,7 @@ export default function MedicationFormScreen() {
           end: end.trim(),
           stock: stockNumber,
           alert,
+          image,
         });
         showToast('Medication added');
         setTimeout(() => {
@@ -309,22 +314,8 @@ export default function MedicationFormScreen() {
             </View>
           </View>
 
-          {/* Photo Box (UI Only) */}
-          <TouchableOpacity
-            style={styles.photoBox}
-            onPress={() => showToast('Photo & prescription scanner will be added later')}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Tap to add or change medication photo"
-          >
-            <PatientIcon name="camera" size={32} color={PATIENT_COLORS.brand} strokeWidth={2} />
-            <Text style={styles.photoBoxTitle} allowFontScaling={true}>
-              Tap to {isEditing ? 'retake / change' : 'add'} photo
-            </Text>
-            <Text style={styles.photoBoxSub} allowFontScaling={true}>
-              Supports AI pill & prescription scanner
-            </Text>
-          </TouchableOpacity>
+          {/* Medication Photo Picker */}
+          <MedicationImagePicker value={image} onChange={setImage} />
 
           {/* 1. Medicine Name (Required) */}
           <Text style={styles.fieldLabel} allowFontScaling={true}>

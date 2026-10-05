@@ -20,6 +20,7 @@ import {
 } from '../../services/medicationService';
 import BottomNav from '../../components/patient/BottomNav';
 import PatientIcon from '../../components/patient/PatientIcons';
+import MedicationThumb from '../../components/patient/MedicationThumb';
 
 type PeriodFilter = 'All' | 'Morning' | 'Afternoon' | 'Evening';
 
@@ -205,31 +206,38 @@ export default function MedicationsScreen() {
                     activeOpacity={0.75}
                     accessibilityRole="button"
                     accessibilityLabel={`View details for ${med.name}`}
+                    style={styles.cardTopRow}
                   >
-                    {/* Row 1: Name and Active badge */}
-                    <View style={styles.cardHeader}>
-                      <Text style={styles.medName} allowFontScaling={true}>
-                        {med.name}
+                    {/* Left: Medication thumbnail */}
+                    <MedicationThumb uri={med.image} size={56} radius={16} style={styles.cardThumb} />
+
+                    {/* Right: Info */}
+                    <View style={styles.cardBody}>
+                      {/* Row 1: Name and Active badge */}
+                      <View style={styles.cardHeader}>
+                        <Text style={styles.medName} allowFontScaling={true} numberOfLines={1}>
+                          {med.name}
+                        </Text>
+                        <View style={styles.activeBadge}>
+                          <Text style={styles.activeBadgeText} allowFontScaling={true}>
+                            Active
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Purpose */}
+                      <Text style={styles.medPurpose} allowFontScaling={true} numberOfLines={1}>
+                        For {med.purpose || 'general health'}
                       </Text>
-                      <View style={styles.activeBadge}>
-                        <Text style={styles.activeBadgeText} allowFontScaling={true}>
-                          Active
+
+                      {/* Times & Form info */}
+                      <View style={styles.medScheduleRow}>
+                        <PatientIcon name="clock" size={16} color={PATIENT_COLORS.muted} />
+                        <Text style={styles.medScheduleText} allowFontScaling={true} numberOfLines={1}>
+                          {formattedTimes} • {med.qty} {med.form.toLowerCase()}
+                          {med.qty > 1 ? 's' : ''} • {med.meal}
                         </Text>
                       </View>
-                    </View>
-
-                    {/* Purpose */}
-                    <Text style={styles.medPurpose} allowFontScaling={true}>
-                      For {med.purpose || 'general health'}
-                    </Text>
-
-                    {/* Times & Form info */}
-                    <View style={styles.medScheduleRow}>
-                      <PatientIcon name="clock" size={18} color={PATIENT_COLORS.muted} />
-                      <Text style={styles.medScheduleText} allowFontScaling={true}>
-                        {formattedTimes} • {med.qty} {med.form.toLowerCase()}
-                        {med.qty > 1 ? 's' : ''} • {med.meal}
-                      </Text>
                     </View>
                   </TouchableOpacity>
 
@@ -465,6 +473,17 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 16,
     marginBottom: 12,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+  },
+  cardThumb: {
+    marginTop: 2,
+  },
+  cardBody: {
+    flex: 1,
   },
   cardHeader: {
     flexDirection: 'row',

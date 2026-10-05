@@ -21,6 +21,7 @@ export interface Medication {
   stock: number;
   alert: boolean;
   taken: Record<string, boolean>; // e.g. { '08:00': true }
+  image?: string;
 }
 
 export interface DoseScheduleItem {
@@ -222,6 +223,7 @@ export async function addMedication(
   item: Omit<Medication, 'id' | 'taken'> & { taken?: Record<string, boolean> }
 ): Promise<Medication> {
   await delay();
+  // TODO: in the real database store an image URL after uploading to storage (base64 is demo only)
   const newMed: Medication = {
     ...item,
     meal: item.meal || 'After food',
@@ -232,6 +234,7 @@ export async function addMedication(
     taken: item.taken || {},
     times: [...new Set(item.times)].sort(),
     days: [...new Set(item.days || [0, 1, 2, 3, 4, 5, 6])].sort(),
+    image: item.image,
   };
   medicationsStore = [...medicationsStore, newMed];
   emitChange();
@@ -261,12 +264,17 @@ export async function updateMedication(
     }
   }
 
+  // TODO: in the real database store an image URL after uploading to storage (base64 is demo only)
+  // Ensure image is kept on edit (never drop it unless explicitly changed)
+  const updatedImage = item.image !== undefined ? item.image : existing.image;
+
   const updated: Medication = {
     ...existing,
     ...item,
     id,
     times: updatedTimes,
     taken: updatedTaken,
+    image: updatedImage,
   };
 
   medicationsStore = [
