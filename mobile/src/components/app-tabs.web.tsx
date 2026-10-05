@@ -1,23 +1,70 @@
-import { Tabs, TabSlot } from 'expo-router/ui';
-import { StyleSheet, View } from 'react-native';
+import { Tabs, TabList, TabTrigger, TabSlot, type TabTriggerSlotProps } from 'expo-router/ui';
+import type { Href } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 export default function AppTabs() {
   return (
     <Tabs>
-      <View style={styles.container}>
-        <TabSlot style={styles.slot} />
-      </View>
+      <TabSlot />
+      <TabList asChild>
+        <View style={styles.tabBar}>
+          <TabTrigger name="home" href="/" asChild>
+            <TabBtn label="Dashboard" />
+          </TabTrigger>
+          <TabTrigger name="explore" href={'/explore' as Href} asChild>
+            <TabBtn label="Explore" />
+          </TabTrigger>
+          <TabTrigger name="profile" href={'/profile' as Href} asChild>
+            <TabBtn label="Profile" />
+          </TabTrigger>
+          <TabTrigger name="settings" href={'/settings' as Href} asChild>
+            <TabBtn label="Settings" />
+          </TabTrigger>
+        </View>
+      </TabList>
     </Tabs>
   );
 }
 
+function TabBtn({ label, isFocused, ...props }: TabTriggerSlotProps & { label: string }) {
+  return (
+    <Pressable
+      {...props}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={[styles.tab, isFocused && styles.tabActive]}>
+      <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    height: '100%',
-    backgroundColor: '#F5F8F6',
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E6EFE9',
+    paddingBottom: 12,
+    paddingTop: 8,
+    paddingHorizontal: 8,
+    justifyContent: 'space-around',
   },
-  slot: {
-    height: '100%',
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  tabActive: {
+    backgroundColor: '#E8F6EF',
+  },
+  tabLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#8E9E96',
+  },
+  tabLabelActive: {
+    color: '#0E3E2F',
+    fontWeight: '700',
   },
 });
