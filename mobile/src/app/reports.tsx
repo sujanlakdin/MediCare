@@ -77,7 +77,7 @@ export default function ReportsScreen() {
                 <CircularGauge percentage={85} size={76} strokeWidth={7} />
               </View>
 
-              {/* Weekly Activity Bar Chart */}
+              {/* Weekly Activity Bar Chart. */}
               <WeeklyChart />
 
               {/* By Medication List */}
