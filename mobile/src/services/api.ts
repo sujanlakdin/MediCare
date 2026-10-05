@@ -109,9 +109,12 @@ export interface PatientItem {
 }
 
 export const medicationApi = {
-  getMedications: async (): Promise<MedicationItem[]> => {
+  getMedications: async (patientId?: string): Promise<MedicationItem[]> => {
     try {
-      const res = await fetch(`${API_BASE_URL}/medications`);
+      const url = patientId
+        ? `${API_BASE_URL}/medications?patientId=${patientId}`
+        : `${API_BASE_URL}/medications`;
+      const res = await fetch(url);
       if (!res.ok) {
         return [];
       }

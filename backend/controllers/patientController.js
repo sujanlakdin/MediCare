@@ -1,20 +1,52 @@
 const Patient = require('../models/Patient');
 
-// Sample default patient if database is empty
-const defaultPatient = {
-  _id: '650000000000000000000001',
-  name: 'Eleanor Johnson',
-  age: 68,
-  role: 'Patient',
-  statusBadgeText: 'MONITORING ACTIVE',
-  phone: '+1 (555) 019-2831',
-  vitals: {
-    bloodPressure: '128/82',
-    heartRate: 72,
-    bloodSugar: 145,
-    lastUpdated: new Date(),
+// Sample default patients if database is empty
+const defaultPatients = [
+  {
+    _id: '650000000000000000000001',
+    name: 'Eleanor Johnson',
+    age: 68,
+    role: 'Patient',
+    statusBadgeText: 'MONITORING ACTIVE',
+    phone: '+1 (555) 019-2831',
+    vitals: {
+      bloodPressure: '128/82',
+      heartRate: 72,
+      bloodSugar: 145,
+      lastUpdated: new Date(),
+    },
   },
-};
+  {
+    _id: '650000000000000000000002',
+    name: 'Robert Chen',
+    age: 74,
+    role: 'Patient',
+    statusBadgeText: 'MONITORING ACTIVE',
+    phone: '+1 (555) 019-4412',
+    vitals: {
+      bloodPressure: '135/88',
+      heartRate: 78,
+      bloodSugar: 110,
+      lastUpdated: new Date(),
+    },
+  },
+  {
+    _id: '650000000000000000000003',
+    name: 'Maria Garcia',
+    age: 62,
+    role: 'Patient',
+    statusBadgeText: 'ATTENTION NEEDED',
+    phone: '+1 (555) 019-8890',
+    vitals: {
+      bloodPressure: '142/92',
+      heartRate: 84,
+      bloodSugar: 168,
+      lastUpdated: new Date(),
+    },
+  },
+];
+
+const defaultPatient = defaultPatients[0];
 
 // @desc    Get linked patients for caregiver
 // @route   GET /api/patients
@@ -23,11 +55,11 @@ exports.getPatients = async (req, res) => {
   try {
     const patients = await Patient.find();
     if (!patients || patients.length === 0) {
-      return res.json([defaultPatient]);
+      return res.json(defaultPatients);
     }
     res.json(patients);
   } catch (error) {
-    res.json([defaultPatient]);
+    res.json(defaultPatients);
   }
 };
 
@@ -38,11 +70,13 @@ exports.getPatientById = async (req, res) => {
   try {
     const patient = await Patient.findById(req.params.id);
     if (!patient) {
-      return res.json(defaultPatient);
+      const foundSample = defaultPatients.find((p) => p._id === req.params.id);
+      return res.json(foundSample || defaultPatient);
     }
     res.json(patient);
   } catch (error) {
-    res.json(defaultPatient);
+    const foundSample = defaultPatients.find((p) => p._id === req.params.id);
+    res.json(foundSample || defaultPatient);
   }
 };
 
@@ -55,7 +89,8 @@ exports.updateVitals = async (req, res) => {
     let patient = await Patient.findById(req.params.id);
 
     if (!patient) {
-      patient = new Patient(defaultPatient);
+      const sample = defaultPatients.find((p) => p._id === req.params.id) || defaultPatient;
+      patient = new Patient(sample);
     }
 
     patient.vitals = {

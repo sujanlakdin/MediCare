@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScrollView, StyleSheet, View, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -7,10 +7,45 @@ import { PatientCard } from '@/components/caregiver/PatientCard';
 import { VitalSignsCard } from '@/components/caregiver/VitalSignsCard';
 import { MedicationList } from '@/components/caregiver/MedicationList';
 import { Colors, MaxContentWidth } from '@/constants/theme';
+import { patientApi, medicationApi, PatientItem, MedicationItem } from '@/services/api';
 
 export default function PatientsScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'oversight' | 'medications'>('oversight');
+  const [patients, setPatients] = useState<PatientItem[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<PatientItem | null>(null);
+  const [medications, setMedications] = useState<MedicationItem[]>([]);
+
+  useEffect(() => {
+    loadPatients();
+  }, []);
+
+  const loadPatients = async () => {
+    try {
+      const list = await patientApi.getPatients();
+      setPatients(list);
+      if (list.length > 0) {
+        setSelectedPatient(list[0]);
+        loadMedications(list[0]._id);
+      }
+    } catch (err) {
+      console.error('Failed to load patients in PatientsScreen:', err);
+    }
+  };
+
+  const loadMedications = async (patientId: string) => {
+    try {
+      const list = await medicationApi.getMedications(patientId);
+      setMedications(list);
+    } catch (err) {
+      console.error('Failed to load medications:', err);
+    }
+  };
+
+  const handleSelectPatient = (patient: PatientItem) => {
+    setSelectedPatient(patient);
+    loadMedications(patient._id);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -56,12 +91,15 @@ export default function PatientsScreen() {
             </Pressable>
           </View>
 
-          {/* Patient Header Card */}
+          {/* Patient Header Card with Switcher */}
           <PatientCard
-            patientName="Eleanor Johnson"
-            patientAge={68}
-            patientRole="Patient"
-            statusBadgeText="MONITORING ACTIVE"
+            patientName={selectedPatient?.name || 'Eleanor Johnson'}
+            patientAge={selectedPatient?.age || 68}
+            patientRole={selectedPatient?.role || 'Patient'}
+            statusBadgeText={selectedPatient?.statusBadgeText || 'MONITORING ACTIVE'}
+            patientsList={patients}
+            selectedPatientId={selectedPatient?._id}
+            onSelectPatient={handleSelectPatient}
           />
 
           {activeTab === 'oversight' ? (
@@ -124,9 +162,9 @@ export default function PatientsScreen() {
 
               {/* Vitals Signs */}
               <VitalSignsCard
-                bloodPressure="128/82"
-                heartRate={72}
-                bloodSugar={145}
+                bloodPressure={selectedPatient?.vitals?.bloodPressure || '128/82'}
+                heartRate={selectedPatient?.vitals?.heartRate || 72}
+                bloodSugar={selectedPatient?.vitals?.bloodSugar || 145}
                 onViewHistory={() => router.push('/history')}
               />
             </>

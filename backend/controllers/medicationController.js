@@ -1,60 +1,147 @@
 const Medication = require('../models/Medication');
 
-const defaultMedications = [
-  {
-    _id: '650000000000000000000101',
-    name: 'Lisinopril',
-    dosage: '10mg',
-    frequency: 'Daily',
-    scheduledTime: '08:00 AM',
-    instructions: 'Take 1 tablet in the morning with food',
-    status: 'taken',
-    adherencePercent: 95,
-  },
-  {
-    _id: '650000000000000000000102',
-    name: 'Atorvastatin',
-    dosage: '20mg',
-    frequency: 'Daily',
-    scheduledTime: '08:00 AM',
-    instructions: 'Take 1 tablet at breakfast',
-    status: 'taken',
-    adherencePercent: 90,
-  },
-  {
-    _id: '650000000000000000000103',
-    name: 'Metformin',
-    dosage: '500mg',
-    frequency: 'Twice daily',
-    scheduledTime: '12:30 PM',
-    instructions: 'Take 1 tablet after lunch with full glass of water',
-    status: 'missed',
-    adherencePercent: 75,
-  },
-  {
-    _id: '650000000000000000000104',
-    name: 'Amlodipine',
-    dosage: '5mg',
-    frequency: 'Daily',
-    scheduledTime: '09:00 PM',
-    instructions: 'Take 1 tablet before bedtime',
-    status: 'upcoming',
-    adherencePercent: 88,
-  },
-];
+const defaultMedicationsByPatient = {
+  '650000000000000000000001': [
+    {
+      _id: '650000000000000000000101',
+      patientId: '650000000000000000000001',
+      name: 'Lisinopril',
+      dosage: '10mg',
+      frequency: 'Daily',
+      scheduledTime: '08:00 AM',
+      instructions: 'Take 1 tablet in the morning with food',
+      status: 'taken',
+      adherencePercent: 95,
+    },
+    {
+      _id: '650000000000000000000102',
+      patientId: '650000000000000000000001',
+      name: 'Atorvastatin',
+      dosage: '20mg',
+      frequency: 'Daily',
+      scheduledTime: '08:00 AM',
+      instructions: 'Take 1 tablet at breakfast',
+      status: 'taken',
+      adherencePercent: 90,
+    },
+    {
+      _id: '650000000000000000000103',
+      patientId: '650000000000000000000001',
+      name: 'Metformin',
+      dosage: '500mg',
+      frequency: 'Twice daily',
+      scheduledTime: '12:30 PM',
+      instructions: 'Take 1 tablet after lunch with full glass of water',
+      status: 'missed',
+      adherencePercent: 75,
+    },
+    {
+      _id: '650000000000000000000104',
+      patientId: '650000000000000000000001',
+      name: 'Amlodipine',
+      dosage: '5mg',
+      frequency: 'Daily',
+      scheduledTime: '09:00 PM',
+      instructions: 'Take 1 tablet before bedtime',
+      status: 'upcoming',
+      adherencePercent: 88,
+    },
+  ],
+  '650000000000000000000002': [
+    {
+      _id: '650000000000000000000201',
+      patientId: '650000000000000000000002',
+      name: 'Insulin Glargine',
+      dosage: '20 Units',
+      frequency: 'Daily',
+      scheduledTime: '08:00 AM',
+      instructions: 'Subcutaneous injection before breakfast',
+      status: 'taken',
+      adherencePercent: 100,
+    },
+    {
+      _id: '650000000000000000000202',
+      patientId: '650000000000000000000002',
+      name: 'Omeprazole',
+      dosage: '20mg',
+      frequency: 'Daily',
+      scheduledTime: '09:00 AM',
+      instructions: 'Take 30 mins before first meal',
+      status: 'taken',
+      adherencePercent: 92,
+    },
+    {
+      _id: '650000000000000000000203',
+      patientId: '650000000000000000000002',
+      name: 'Aspirin',
+      dosage: '81mg',
+      frequency: 'Daily',
+      scheduledTime: '08:00 PM',
+      instructions: 'Take low-dose aspirin with evening meal',
+      status: 'upcoming',
+      adherencePercent: 95,
+    },
+  ],
+  '650000000000000000000003': [
+    {
+      _id: '650000000000000000000301',
+      patientId: '650000000000000000000003',
+      name: 'Losartan',
+      dosage: '50mg',
+      frequency: 'Daily',
+      scheduledTime: '08:00 AM',
+      instructions: 'Take 1 tablet in morning for BP control',
+      status: 'missed',
+      adherencePercent: 68,
+    },
+    {
+      _id: '650000000000000000000302',
+      patientId: '650000000000000000000003',
+      name: 'Metformin XR',
+      dosage: '1000mg',
+      frequency: 'Daily',
+      scheduledTime: '01:00 PM',
+      instructions: 'Take with dinner',
+      status: 'upcoming',
+      adherencePercent: 72,
+    },
+    {
+      _id: '650000000000000000000303',
+      patientId: '650000000000000000000003',
+      name: 'Gabapentin',
+      dosage: '300mg',
+      frequency: 'Twice daily',
+      scheduledTime: '09:00 PM',
+      instructions: 'Take at night to manage nerve discomfort',
+      status: 'upcoming',
+      adherencePercent: 80,
+    },
+  ],
+};
+
+const allDefaultMedications = Object.values(defaultMedicationsByPatient).flat();
 
 // @desc    Get medications for a patient
-// @route   GET /api/medications
+// @route   GET /api/medications?patientId=...
 // @access  Public / Protected
 exports.getMedications = async (req, res) => {
   try {
-    const meds = await Medication.find().sort({ createdAt: -1 });
+    const { patientId } = req.query;
+    const query = patientId ? { patientId } : {};
+    const meds = await Medication.find(query).sort({ createdAt: -1 });
+
     if (!meds || meds.length === 0) {
-      return res.json(defaultMedications);
+      if (patientId && defaultMedicationsByPatient[patientId]) {
+        return res.json(defaultMedicationsByPatient[patientId]);
+      }
+      return res.json(allDefaultMedications);
     }
     res.json(meds);
   } catch (error) {
-    res.json(defaultMedications);
+    if (req.query.patientId && defaultMedicationsByPatient[req.query.patientId]) {
+      return res.json(defaultMedicationsByPatient[req.query.patientId]);
+    }
+    res.json(allDefaultMedications);
   }
 };
 
