@@ -28,10 +28,11 @@ import {
 
 export default function MedicationDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
-  const idNum = params.id ? Number(params.id) : null;
   const medications = useMedications();
 
-  const medication: Medication | undefined = medications.find((m) => m.id === idNum);
+  const medication: Medication | undefined = medications.find(
+    (m) => String(m.id) === String(params.id) || (m._id && String(m._id) === String(params.id))
+  );
 
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);

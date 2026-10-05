@@ -1,13 +1,13 @@
 import { useSyncExternalStore } from 'react';
+import { Platform } from 'react-native';
 
 /**
  * Type Medication Definition
- * 
- * TODO: connect real API / database
- * Future table: id, user_id, name, purpose, form, qty, meal, times, days, repeat, start_date, end_date, stock, alert, created_at
+ * Connected to MongoDB backend at http://localhost:5000/api/medications
  */
 export interface Medication {
-  id: number;
+  id: number | string;
+  _id?: string;
   name: string;
   purpose: string;
   form: 'Tablet' | 'Capsule' | 'Syrup';
@@ -35,7 +35,7 @@ export interface DoseScheduleItem {
 // Initial Seed Data matching prompt specifications
 const INITIAL_MEDICATIONS: Medication[] = [
   {
-    id: 1,
+    id: '66f000000000000000000001',
     name: 'Lisinopril 10mg',
     purpose: 'Blood pressure',
     form: 'Tablet',
@@ -49,9 +49,10 @@ const INITIAL_MEDICATIONS: Medication[] = [
     stock: 24,
     alert: true,
     taken: { '08:00': true },
+    image: '',
   },
   {
-    id: 2,
+    id: '66f000000000000000000002',
     name: 'Atorvastatin 20mg',
     purpose: 'Cholesterol',
     form: 'Tablet',
@@ -65,9 +66,10 @@ const INITIAL_MEDICATIONS: Medication[] = [
     stock: 18,
     alert: true,
     taken: { '08:00': true },
+    image: '',
   },
   {
-    id: 3,
+    id: '66f00000000000000000003',
     name: 'Metformin 500mg',
     purpose: 'Diabetes management',
     form: 'Tablet',
@@ -81,9 +83,10 @@ const INITIAL_MEDICATIONS: Medication[] = [
     stock: 6,
     alert: true,
     taken: {},
+    image: '',
   },
   {
-    id: 4,
+    id: '66f00000000000000000004',
     name: 'Amlodipine 5mg',
     purpose: 'Blood pressure',
     form: 'Tablet',
@@ -97,12 +100,48 @@ const INITIAL_MEDICATIONS: Medication[] = [
     stock: 30,
     alert: true,
     taken: {},
+    image: '',
   },
 ];
 
+// Backend API endpoint configuration
+const API_BASE_URL =
+  Platform.OS === 'android' ? 'http://10.0.2.2:5000' : 'http://localhost:5000';
+
+function normalizeMedication(raw: any): Medication {
+  const id = raw.id || raw._id || String(Date.now());
+  let takenObj: Record<string, boolean> = {};
+  if (raw.taken) {
+    if (raw.taken instanceof Map) {
+      takenObj = Object.fromEntries(raw.taken);
+    } else if (typeof raw.taken === 'object') {
+      takenObj = { ...raw.taken };
+    }
+  }
+
+  return {
+    id,
+    _id: raw._id ? String(raw._id) : String(id),
+    name: raw.name || '',
+    purpose: raw.purpose || '',
+    form: raw.form || 'Tablet',
+    qty: Math.max(1, Number(raw.qty) || 1),
+    meal: raw.meal || 'After food',
+    times: Array.isArray(raw.times) && raw.times.length > 0 ? raw.times : ['08:00'],
+    days: Array.isArray(raw.days) && raw.days.length > 0 ? raw.days : [0, 1, 2, 3, 4, 5, 6],
+    repeat: raw.repeat || 'Daily',
+    start: raw.start || '',
+    end: raw.end || '',
+    stock: Math.max(0, Number(raw.stock) || 0),
+    alert: raw.alert !== undefined ? Boolean(raw.alert) : true,
+    taken: takenObj,
+    image: raw.image || undefined,
+  };
+}
+
 // Module-level in-memory reactive store
 let medicationsStore: Medication[] = [...INITIAL_MEDICATIONS];
-let nextMedicationId = 10;
+let nextMedicationId = 100;
 let listeners: Array<() => void> = [];
 
 function emitChange() {
@@ -205,68 +244,171 @@ export function getFlattenedDoses(
   return doses.sort((a, b) => a.time.localeCompare(b.time));
 }
 
-// Mock async functions with a short delay (TODO: replace with database / API calls)
-const delay = (ms = 180) => new Promise((resolve) => setTimeout(resolve, ms));
-
+/**
+ * Fetch all medications from MongoDB backend API
+ */
 export async function listMedications(): Promise<Medication[]> {
-  await delay();
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/medications`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && Array.isArray(json.data)) {
+        medicationsStore = json.data.map(normalizeMedication);
+        emitChange();
+        return medicationsStore;
+      }
+    }
+  } catch (e) {
+    // Graceful fallback to local reactive store
+  }
   return [...medicationsStore];
 }
 
-export async function getMedication(id: number): Promise<Medication | null> {
-  await delay(100);
-  const found = medicationsStore.find((m) => m.id === id);
+/**
+ * Get medication details by id from MongoDB API
+ */
+export async function getMedication(id: number | string): Promise<Medication | null> {
+  const idStr = String(id);
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/medications/${idStr}`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.data) {
+        return normalizeMedication(json.data);
+      }
+    }
+  } catch (e) {
+    // Fallback to local store
+  }
+  const found = medicationsStore.find((m) => String(m.id) === idStr || String(m._id) === idStr);
   return found ? { ...found } : null;
 }
 
+/**
+ * Add medication to MongoDB via backend API
+ */
 export async function addMedication(
   item: Omit<Medication, 'id' | 'taken'> & { taken?: Record<string, boolean> }
 ): Promise<Medication> {
-  await delay();
-  // TODO: in the real database store an image URL after uploading to storage (base64 is demo only)
-  const newMed: Medication = {
+  const payload = {
     ...item,
     meal: item.meal || 'After food',
     start: item.start || '',
     end: item.end || '',
     alert: item.alert !== undefined ? item.alert : true,
-    id: ++nextMedicationId,
     taken: item.taken || {},
     times: [...new Set(item.times)].sort(),
     days: [...new Set(item.days || [0, 1, 2, 3, 4, 5, 6])].sort(),
-    image: item.image,
+    image: item.image || '',
   };
-  medicationsStore = [...medicationsStore, newMed];
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/medications`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.data) {
+        const saved = normalizeMedication(json.data);
+        medicationsStore = [saved, ...medicationsStore.filter((m) => String(m.id) !== String(saved.id))];
+        emitChange();
+        return saved;
+      }
+    }
+  } catch (e) {
+    // Fallback to local store
+  }
+
+  const fallbackId = String(++nextMedicationId);
+  const newMed: Medication = {
+    ...payload,
+    id: fallbackId,
+    _id: fallbackId,
+  };
+  medicationsStore = [newMed, ...medicationsStore];
   emitChange();
   return newMed;
 }
 
+/**
+ * Update medication in MongoDB via backend API
+ */
 export async function updateMedication(
-  id: number,
+  id: number | string,
   item: Partial<Medication>
 ): Promise<Medication> {
-  await delay();
-  const index = medicationsStore.findIndex((m) => m.id === id);
-  if (index === -1) {
-    throw new Error(`Medication with id ${id} not found`);
-  }
+  const idStr = String(id);
+  const index = medicationsStore.findIndex(
+    (m) => String(m.id) === idStr || String(m._id) === idStr
+  );
 
-  const existing = medicationsStore[index];
-  const updatedTimes = item.times ? [...new Set(item.times)].sort() : existing.times;
+  const existing = index !== -1 ? medicationsStore[index] : null;
+  const updatedTimes = item.times
+    ? [...new Set(item.times)].sort()
+    : existing ? existing.times : ['08:00'];
 
-  // Filter taken flags to keep only those still present in times
   const updatedTaken: Record<string, boolean> = {};
   for (const t of updatedTimes) {
     if (item.taken && item.taken[t] !== undefined) {
       updatedTaken[t] = item.taken[t];
-    } else if (existing.taken[t]) {
+    } else if (existing && existing.taken && existing.taken[t]) {
       updatedTaken[t] = true;
     }
   }
 
-  // TODO: in the real database store an image URL after uploading to storage (base64 is demo only)
-  // Ensure image is kept on edit (never drop it unless explicitly changed)
-  const updatedImage = item.image !== undefined ? item.image : existing.image;
+  const updatedImage = item.image !== undefined ? item.image : (existing ? existing.image : '');
+
+  const payload: Partial<Medication> = {
+    ...item,
+    times: updatedTimes,
+    taken: updatedTaken,
+    image: updatedImage,
+  };
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/medications/${idStr}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.data) {
+        const saved = normalizeMedication(json.data);
+        if (index !== -1) {
+          medicationsStore = [
+            ...medicationsStore.slice(0, index),
+            saved,
+            ...medicationsStore.slice(index + 1),
+          ];
+        } else {
+          medicationsStore = [saved, ...medicationsStore];
+        }
+        emitChange();
+        return saved;
+      }
+    }
+  } catch (e) {
+    // Fallback to local store
+  }
+
+  if (!existing) {
+    throw new Error(`Medication with id ${id} not found`);
+  }
 
   const updated: Medication = {
     ...existing,
@@ -286,16 +428,44 @@ export async function updateMedication(
   return updated;
 }
 
-export async function deleteMedication(id: number): Promise<boolean> {
-  await delay();
-  medicationsStore = medicationsStore.filter((m) => m.id !== id);
+/**
+ * Delete medication from MongoDB via backend API
+ */
+export async function deleteMedication(id: number | string): Promise<boolean> {
+  const idStr = String(id);
+  try {
+    await fetch(`${API_BASE_URL}/api/medications/${idStr}`, {
+      method: 'DELETE',
+    });
+  } catch (e) {
+    // Fallback to local store
+  }
+
+  medicationsStore = medicationsStore.filter(
+    (m) => String(m.id) !== idStr && String(m._id) !== idStr
+  );
   emitChange();
   return true;
 }
 
-export async function markDoseTaken(id: number, time: string): Promise<boolean> {
-  await delay(100);
-  const index = medicationsStore.findIndex((m) => m.id === id);
+/**
+ * Mark dose as taken in MongoDB via backend API
+ */
+export async function markDoseTaken(id: number | string, time: string): Promise<boolean> {
+  const idStr = String(id);
+  try {
+    fetch(`${API_BASE_URL}/api/medications/${idStr}/taken`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ time }),
+    }).catch(() => {});
+  } catch (e) {}
+
+  const index = medicationsStore.findIndex(
+    (m) => String(m.id) === idStr || String(m._id) === idStr
+  );
   if (index === -1) return false;
 
   const current = medicationsStore[index];
@@ -316,15 +486,28 @@ export async function markDoseTaken(id: number, time: string): Promise<boolean> 
   return true;
 }
 
-export async function toggleRefillAlert(id: number): Promise<boolean> {
-  await delay(80);
-  const index = medicationsStore.findIndex((m) => m.id === id);
+/**
+ * Toggle refill alert in MongoDB via backend API
+ */
+export async function toggleRefillAlert(id: number | string): Promise<boolean> {
+  const idStr = String(id);
+  const index = medicationsStore.findIndex(
+    (m) => String(m.id) === idStr || String(m._id) === idStr
+  );
   if (index === -1) return false;
 
   const current = medicationsStore[index];
+  const nextAlert = !current.alert;
+
+  try {
+    fetch(`${API_BASE_URL}/api/medications/${idStr}/alert`, {
+      method: 'PATCH',
+    }).catch(() => {});
+  } catch (e) {}
+
   const updated: Medication = {
     ...current,
-    alert: !current.alert,
+    alert: nextAlert,
   };
 
   medicationsStore = [
@@ -335,3 +518,6 @@ export async function toggleRefillAlert(id: number): Promise<boolean> {
   emitChange();
   return updated.alert;
 }
+
+// Automatically fetch from backend API on launch to hydrate reactive store
+listMedications().catch(() => {});

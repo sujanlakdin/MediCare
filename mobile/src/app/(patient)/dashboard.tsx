@@ -100,7 +100,7 @@ export default function DashboardScreen() {
   const dueCount = doses.filter((d) => !d.isTaken && d.time <= nowTime).length;
   const nextPendingDose = doses.find((d) => !d.isTaken);
 
-  const handleTakeDose = async (id: number, time: string, medName: string) => {
+  const handleTakeDose = async (id: number | string, time: string, medName: string) => {
     try {
       await markDoseTaken(id, time);
       showToast(`${medName} dose marked as taken`);

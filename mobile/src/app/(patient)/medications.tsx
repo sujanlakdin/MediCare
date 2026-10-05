@@ -28,7 +28,7 @@ export default function MedicationsScreen() {
   const medications = useMedications();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<PeriodFilter>('All');
-  const [armedDeleteId, setArmedDeleteId] = useState<number | null>(null);
+  const [armedDeleteId, setArmedDeleteId] = useState<number | string | null>(null);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const armTimeoutRef = useRef<any>(null);
@@ -63,7 +63,7 @@ export default function MedicationsScreen() {
   const lowStockMed = medications.find((m) => m.alert && m.stock <= 5);
 
   // 2-Tap Delete Handler
-  const handleDeletePress = async (id: number, name: string) => {
+  const handleDeletePress = async (id: number | string, name: string) => {
     if (armedDeleteId === id) {
       if (armTimeoutRef.current) clearTimeout(armTimeoutRef.current);
       setArmedDeleteId(null);
@@ -78,14 +78,14 @@ export default function MedicationsScreen() {
     }
   };
 
-  const handleCardPress = (id: number) => {
+  const handleCardPress = (id: number | string) => {
     router.push({
       pathname: '/(patient)/medication-detail' as any,
       params: { id: String(id) },
     });
   };
 
-  const handleEditPress = (id: number) => {
+  const handleEditPress = (id: number | string) => {
     router.push({
       pathname: '/(patient)/medication-form' as any,
       params: { id: String(id) },

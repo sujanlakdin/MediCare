@@ -43,7 +43,7 @@ const FORM_SUBTITLES: Record<FormType, string> = {
 export default function MedicationFormScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const medications = useMedications();
-  const editId = params.id ? Number(params.id) : null;
+  const editId = params.id ? String(params.id) : null;
   const isEditing = !!editId;
 
   // Form Fields State
@@ -88,7 +88,9 @@ export default function MedicationFormScreen() {
   // Pre-fill fields if editing an existing medication
   useEffect(() => {
     if (editId) {
-      const existing = medications.find((m) => m.id === editId);
+      const existing = medications.find(
+        (m) => String(m.id) === editId || (m._id && String(m._id) === editId)
+      );
       if (existing) {
         setName(existing.name);
         setPurpose(existing.purpose || '');
