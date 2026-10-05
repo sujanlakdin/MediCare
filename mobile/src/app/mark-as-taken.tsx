@@ -11,19 +11,37 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, Tabs, Stack } from 'expo-router';
+import { useRouter, Tabs, Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { MaxContentWidth } from '@/constants/theme';
+import { useMedicareStore, markTaken, undoDoseLog, goBackTo } from '@/medicare';
 
 const AVAILABLE_SIDE_EFFECTS = ['Nausea', 'Dizziness', 'Headache'];
 
 export default function MarkAsTakenScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ id?: string; medicationId?: string; from?: string }>();
+  const medId = params.id || params.medicationId;
+
+  const { medications, reminders, doseLogs } = useMedicareStore();
+
+  const currentMed =
+    medications.find((m) => m.id === medId) ||
+    medications.find((m) => m.name === 'Metformin') ||
+    medications[0];
+
+  const currentReminder = reminders.find((r) => r.medicationId === currentMed?.id);
+
+  // Check if there is an existing log for today
+  const existingLog = doseLogs.find((l) => l.medicationId === currentMed?.id);
 
   // Local state for note and selectable side-effect chips
-  const [note, setNote] = useState<string>('');
-  // Mock design initially has "Nausea" selected
-  const [selectedSideEffects, setSelectedSideEffects] = useState<string[]>(['Nausea']);
+  const [note, setNote] = useState<string>(existingLog?.note || '');
+  const [selectedSideEffects, setSelectedSideEffects] = useState<string[]>(
+    existingLog?.sideEffects && existingLog.sideEffects.length > 0
+      ? existingLog.sideEffects
+      : ['Nausea']
+  );
 
   const toggleSideEffect = (effect: string) => {
     setSelectedSideEffects((prev) =>
@@ -31,9 +49,19 @@ export default function MarkAsTakenScreen() {
     );
   };
 
-  const handleDone = () => {
-    // Navigate back to medication schedule as requested
-    router.push('/medication-schedule' as any);
+  const handleBack = () => {
+    goBackTo(router, params.from, medId);
+  };
+
+  const handleDone = async () => {
+    if (currentMed) {
+      await markTaken(currentMed.id, {
+        note: note.trim(),
+        sideEffects: selectedSideEffects,
+      });
+    }
+    // Done -> markTaken(id, note, sideEffects) then navigate to /medication-schedule
+    router.navigate({ pathname: '/medication-schedule' });
   };
 
   const handleUndo = () => {
@@ -45,8 +73,12 @@ export default function MarkAsTakenScreen() {
         {
           text: 'Undo',
           style: 'destructive',
-          onPress: () => {
-            router.back();
+          onPress: async () => {
+            if (currentMed) {
+              await undoDoseLog(currentMed.id);
+            }
+            // Undo Action -> undo the log then navigate to /medication-schedule
+            router.navigate({ pathname: '/medication-schedule' });
           },
         },
       ]
@@ -63,7 +95,7 @@ export default function MarkAsTakenScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.headerButton}
-          onPress={() => router.back()}
+          onPress={handleBack}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           activeOpacity={0.7}
           accessibilityLabel="Go back"
@@ -92,7 +124,7 @@ export default function MarkAsTakenScreen() {
               </View>
               <View style={styles.bannerTextContainer}>
                 <Text style={styles.bannerTitle}>Taken Successfully</Text>
-                <Text style={styles.bannerSubtitle}>Logged at 8:12 AM</Text>
+                <Text style={styles.bannerSubtitle}>Logged for today</Text>
               </View>
             </View>
 
@@ -109,8 +141,8 @@ export default function MarkAsTakenScreen() {
                   />
                 </View>
                 <View style={styles.medInfo}>
-                  <Text style={styles.medName}>Lisinopril</Text>
-                  <Text style={styles.medDosage}>10 mg • Tablet</Text>
+                  <Text style={styles.medName}>{currentMed?.name || 'Medication'}</Text>
+                  <Text style={styles.medDosage}>{currentMed?.dose || '10 mg • Tablet'}</Text>
                 </View>
               </View>
 
@@ -121,11 +153,15 @@ export default function MarkAsTakenScreen() {
               <View style={styles.medCardFooter}>
                 <View>
                   <Text style={styles.footerLabel}>SCHEDULED</Text>
-                  <Text style={styles.footerValue}>08:00 AM</Text>
+                  <Text style={styles.footerValue}>
+                    {currentReminder?.time || '08:00 AM'}
+                  </Text>
                 </View>
                 <View style={styles.doseContainer}>
                   <Text style={[styles.footerLabel, styles.alignRight]}>DOSE</Text>
-                  <Text style={[styles.footerValue, styles.alignRight]}>1 Tablet</Text>
+                  <Text style={[styles.footerValue, styles.alignRight]}>
+                    {currentMed?.dose || '1 Dose'}
+                  </Text>
                 </View>
               </View>
             </View>

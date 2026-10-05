@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -9,28 +9,55 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, Tabs, Stack } from 'expo-router';
+import { useRouter, Tabs, Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, MaxContentWidth } from '@/constants/theme';
+import { MaxContentWidth } from '@/constants/theme';
+import {
+  useMedicareStore,
+  markSkipped,
+  snoozeReminder,
+} from '@/medicare';
 
 export default function ReminderNotificationScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ id?: string; medicationId?: string; from?: string }>();
+  const medId = params.id || params.medicationId;
 
-  // Local state for tracking snoozes remaining (initial: 2)
-  const [snoozesRemaining, setSnoozesRemaining] = useState<number>(2);
+  const { medications, reminders } = useMedicareStore();
 
-  const handleMarkAsTaken = () => {
-    router.push('/mark-as-taken' as any);
+  // Find medication and its reminder
+  const currentMed =
+    medications.find((m) => m.id === medId) ||
+    medications.find((m) => m.name === 'Lisinopril') ||
+    medications[0];
+
+  const currentReminder =
+    reminders.find((r) => r.medicationId === currentMed?.id) || reminders[0];
+
+  const snoozesRemaining = currentReminder?.snoozeCountRemaining ?? 2;
+
+  const handleBack = () => {
+    router.navigate({ pathname: '/medication-schedule' });
   };
 
-  const handleSnooze = () => {
-    if (snoozesRemaining > 0) {
-      const nextCount = snoozesRemaining - 1;
-      setSnoozesRemaining(nextCount);
+  const handleMarkAsTaken = () => {
+    if (currentMed) {
+      // Do not save here; navigate to mark-as-taken with id and from=/reminder-notification
+      router.push({
+        pathname: '/mark-as-taken',
+        params: { id: currentMed.id, from: '/reminder-notification' },
+      });
+    }
+  };
+
+  const handleSnooze = async () => {
+    if (currentReminder && snoozesRemaining > 0) {
+      const updated = await snoozeReminder(currentReminder.id, 15);
+      const remaining = updated?.snoozeCountRemaining ?? snoozesRemaining - 1;
       Alert.alert(
         'Reminder Snoozed',
-        `Snoozed for 15 minutes. ${nextCount} ${
-          nextCount === 1 ? 'snooze' : 'snoozes'
+        `Snoozed for 15 minutes. ${remaining} ${
+          remaining === 1 ? 'snooze' : 'snoozes'
         } remaining.`,
         [{ text: 'OK' }]
       );
@@ -42,14 +69,28 @@ export default function ReminderNotificationScreen() {
     }
   };
 
-  const handleSkipDose = () => {
-    router.back();
+  const handleSkipDose = async () => {
+    if (currentMed) {
+      await markSkipped(currentMed.id);
+    }
+    router.navigate({ pathname: '/medication-schedule' });
   };
 
   const handleMoreOptions = () => {
-    Alert.alert('Reminder Options', 'Manage reminder settings for Lisinopril.', [
-      { text: 'View Prescription', onPress: () => router.push('/medication-schedule' as any) },
-      { text: 'Mute for Today', style: 'destructive' },
+    Alert.alert('Reminder Options', `Manage reminder settings for ${currentMed?.name || 'Medication'}.`, [
+      {
+        text: 'View Schedule',
+        onPress: () => router.navigate({ pathname: '/medication-schedule' }),
+      },
+      {
+        text: 'Reschedule',
+        onPress: () =>
+          currentMed &&
+          router.push({
+            pathname: '/reminder-setup',
+            params: { id: currentMed.id, from: '/reminder-notification' },
+          }),
+      },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
@@ -75,7 +116,7 @@ export default function ReminderNotificationScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.headerButton}
-          onPress={() => router.back()}
+          onPress={handleBack}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           activeOpacity={0.7}
           accessibilityLabel="Go back"
@@ -109,19 +150,22 @@ export default function ReminderNotificationScreen() {
               </View>
               <View style={styles.notificationHeaderText}>
                 <Text style={styles.headingTitle}>Time for your meds</Text>
-                <Text style={styles.headingSub}>Scheduled for 8:00 AM</Text>
+                <Text style={styles.headingSub}>
+                  Scheduled for {currentReminder?.time || '08:00 AM'}
+                </Text>
               </View>
             </View>
 
             {/* Inner Medication Box */}
             <View style={styles.medicationCard}>
               <Text style={styles.fieldLabel}>MEDICATION</Text>
-              <Text style={styles.medName}>Lisinopril</Text>
-              <Text style={styles.medDosage}>10 mg Tablet</Text>
+              <Text style={styles.medName}>{currentMed?.name || 'Medication'}</Text>
+              <Text style={styles.medDosage}>{currentMed?.dose || '10 mg Tablet'}</Text>
 
               <Text style={[styles.fieldLabel, styles.instructionsLabel]}>INSTRUCTIONS</Text>
               <Text style={styles.instructionsText}>
-                Take 1 tablet by mouth with a full glass of water. Best taken on an empty stomach.
+                {currentMed?.instructions ||
+                  'Take 1 tablet by mouth with a full glass of water. Best taken on an empty stomach.'}
               </Text>
             </View>
 
@@ -135,7 +179,9 @@ export default function ReminderNotificationScreen() {
 
             <View style={styles.metaRow}>
               <Ionicons name="calendar-outline" size={18} color="#64748B" />
-              <Text style={styles.metaText}>Next: Tomorrow 8:00 AM</Text>
+              <Text style={styles.metaText}>
+                Next: Tomorrow {currentReminder?.time || '8:00 AM'}
+              </Text>
             </View>
 
             {/* Mark as Taken Button */}

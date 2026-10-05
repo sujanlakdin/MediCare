@@ -12,140 +12,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Tabs, Stack } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, MaxContentWidth } from '@/constants/theme';
+import { useMedicareStore } from '@/medicare';
 
 type TimeRange = '7d' | '30d';
-
-interface DayTrend {
-  day: string;
-  height: number; // percentage (0 - 100)
-  color: string;
-  isCurrent?: boolean;
-}
-
-interface MedicationAdherence {
-  id: string;
-  name: string;
-  dosage: string;
-  period: string;
-  percentage: number;
-  color: string;
-  bgColor: string;
-  trackColor: string;
-}
-
-interface PeriodData {
-  overallPercentage: number;
-  takenCount: number;
-  missedCount: number;
-  lateCount: number;
-  takenFill: number;
-  missedFill: number;
-  lateFill: number;
-  streakDays: number;
-  streakMessage: string;
-  weeklyTrend: DayTrend[];
-  medications: MedicationAdherence[];
-}
-
-const MOCK_DATA: Record<TimeRange, PeriodData> = {
-  '7d': {
-    overallPercentage: 84,
-    takenCount: 26,
-    missedCount: 3,
-    lateCount: 2,
-    takenFill: 84,
-    missedFill: 24,
-    lateFill: 14,
-    streakDays: 5,
-    streakMessage: "You're on track. Keep it up!",
-    weeklyTrend: [
-      { day: 'M', height: 50, color: '#DCF5E9' },
-      { day: 'T', height: 72, color: '#DCF5E9' },
-      { day: 'W', height: 38, color: '#FEE2E2' }, // Light red/pink missed bar
-      { day: 'T', height: 95, color: '#2BB673', isCurrent: true }, // Current highlighted day
-      { day: 'F', height: 62, color: '#DCF5E9' },
-      { day: 'S', height: 74, color: '#DCF5E9' },
-      { day: 'S', height: 86, color: '#DCF5E9' },
-    ],
-    medications: [
-      {
-        id: '1',
-        name: 'Lisinopril',
-        dosage: '10mg',
-        period: 'Morning',
-        percentage: 100,
-        color: '#2BB673',
-        bgColor: '#E6F4EE',
-        trackColor: '#E6F4EE',
-      },
-      {
-        id: '2',
-        name: 'Metformin',
-        dosage: '500mg',
-        period: 'Evening',
-        percentage: 65,
-        color: '#EF4444',
-        bgColor: '#FEE2E2',
-        trackColor: '#FEE2E2',
-      },
-    ],
-  },
-  '30d': {
-    overallPercentage: 88,
-    takenCount: 108,
-    missedCount: 9,
-    lateCount: 5,
-    takenFill: 88,
-    missedFill: 18,
-    lateFill: 10,
-    streakDays: 12,
-    streakMessage: 'Outstanding consistency this month!',
-    weeklyTrend: [
-      { day: 'M', height: 80, color: '#DCF5E9' },
-      { day: 'T', height: 85, color: '#DCF5E9' },
-      { day: 'W', height: 60, color: '#FEE2E2' },
-      { day: 'T', height: 100, color: '#2BB673', isCurrent: true },
-      { day: 'F', height: 88, color: '#DCF5E9' },
-      { day: 'S', height: 90, color: '#DCF5E9' },
-      { day: 'S', height: 94, color: '#DCF5E9' },
-    ],
-    medications: [
-      {
-        id: '1',
-        name: 'Lisinopril',
-        dosage: '10mg',
-        period: 'Morning',
-        percentage: 98,
-        color: '#2BB673',
-        bgColor: '#E6F4EE',
-        trackColor: '#E6F4EE',
-      },
-      {
-        id: '2',
-        name: 'Metformin',
-        dosage: '500mg',
-        period: 'Evening',
-        percentage: 78,
-        color: '#EF4444',
-        bgColor: '#FEE2E2',
-        trackColor: '#FEE2E2',
-      },
-    ],
-  },
-};
 
 export default function AdherenceScreen() {
   const router = useRouter();
   const [selectedRange, setSelectedRange] = useState<TimeRange>('7d');
 
-  const currentData = MOCK_DATA[selectedRange];
+  const { computeAdherenceStats } = useMedicareStore();
+  const currentData = computeAdherenceStats(selectedRange);
 
   const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.push('/medication-schedule' as any);
-    }
+    // Back arrow -> /medication-schedule
+    router.navigate({ pathname: '/medication-schedule' });
   };
 
   const handleCalendar = () => {
@@ -158,7 +38,15 @@ export default function AdherenceScreen() {
   };
 
   const handleReviewFullHistory = () => {
-    router.push('/history' as any);
+    // Review Full History -> /history
+    router.push({ pathname: '/history' });
+  };
+
+  const handleMedicationPress = (medId: string) => {
+    router.push({
+      pathname: '/reminder-setup',
+      params: { id: medId, from: '/adherence' },
+    });
   };
 
   return (
@@ -282,7 +170,7 @@ export default function AdherenceScreen() {
                 </View>
               </View>
 
-              {/* Late Metric */}
+              {/* Late / Skipped Metric */}
               <View style={styles.statusMetricCol}>
                 <View style={styles.miniBarTrack}>
                   <View
@@ -335,7 +223,7 @@ export default function AdherenceScreen() {
             </View>
           </View>
 
-          {/* 5 Day Streak Card */}
+          {/* Streak Card */}
           <View style={styles.streakCard}>
             <View style={styles.streakIconCircle}>
               <Ionicons name="flame" size={22} color="#FFFFFF" />
@@ -352,7 +240,11 @@ export default function AdherenceScreen() {
           </View>
 
           {currentData.medications.map((med) => (
-            <View key={med.id} style={styles.medCard}>
+            <TouchableOpacity
+              key={med.id}
+              style={styles.medCard}
+              onPress={() => handleMedicationPress(med.id)}
+              activeOpacity={0.75}>
               <View style={styles.medTopRow}>
                 {/* Pill Icon Box */}
                 <View style={[styles.pillIconBox, { backgroundColor: med.bgColor }]}>
@@ -385,7 +277,7 @@ export default function AdherenceScreen() {
                   ]}
                 />
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
 
           {/* Review Full History Button */}
@@ -431,7 +323,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#154D38',
+    color: '#1E3228',
     letterSpacing: -0.3,
   },
   calendarButton: {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -7,113 +7,89 @@ import {
   TouchableOpacity,
   Pressable,
   Platform,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, Tabs } from 'expo-router';
+import { useRouter, Tabs, Stack } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, MaxContentWidth } from '@/constants/theme';
-
-interface MedicationScheduleItem {
-  id: string;
-  name: string;
-  dosage: string;
-  instructions: string;
-  status: 'TAKEN' | 'DUE_SOON' | 'MISSED';
-  nextTime: string;
-  iconType: 'pill' | 'water';
-  period: 'MORNING' | 'AFTERNOON' | 'EVENING';
-}
-
-const INITIAL_SCHEDULE: MedicationScheduleItem[] = [
-  {
-    id: '1',
-    name: 'Lisinopril',
-    dosage: '10mg',
-    instructions: 'With food',
-    status: 'TAKEN',
-    nextTime: 'Next: Tomorrow, 8:00 AM',
-    iconType: 'pill',
-    period: 'MORNING',
-  },
-  {
-    id: '2',
-    name: 'Vitamin D3',
-    dosage: '2000 IU',
-    instructions: 'Anytime',
-    status: 'TAKEN',
-    nextTime: 'Next: Tomorrow, 8:00 AM',
-    iconType: 'pill',
-    period: 'MORNING',
-  },
-  {
-    id: '3',
-    name: 'Metformin',
-    dosage: '500mg',
-    instructions: 'With lunch',
-    status: 'DUE_SOON',
-    nextTime: 'Next: Tomorrow, 1:00 PM',
-    iconType: 'water',
-    period: 'AFTERNOON',
-  },
-  {
-    id: '4',
-    name: 'Atorvastatin',
-    dosage: '20mg',
-    instructions: 'Before bed',
-    status: 'MISSED',
-    nextTime: 'Next: Tomorrow, 9:00 PM',
-    iconType: 'pill',
-    period: 'EVENING',
-  },
-];
+import { useMedicareStore, ScheduleItem } from '@/medicare';
 
 export default function MedicationScheduleScreen() {
   const router = useRouter();
-  const [schedule, setSchedule] = useState<MedicationScheduleItem[]>(INITIAL_SCHEDULE);
+  const { schedule } = useMedicareStore();
 
-  // Group items by period
+  // Group items dynamically by period computed from reminder time
   const morningItems = schedule.filter((item) => item.period === 'MORNING');
   const afternoonItems = schedule.filter((item) => item.period === 'AFTERNOON');
   const eveningItems = schedule.filter((item) => item.period === 'EVENING');
 
-  // Adherence calculations matching mockup "3/5 Taken"
+  // Adherence progress computed dynamically from store
+  const totalCount = schedule.length;
   const takenCount = schedule.filter((item) => item.status === 'TAKEN').length;
-  // Starting mockup displays 3 taken out of 5 daily doses
-  const displayTaken = takenCount + 1; // 2 initial TAKEN items in state + 1 = 3/5 initial
-  const totalCount = 5;
-  const progressPercent = Math.min(Math.round((displayTaken / totalCount) * 100), 100);
-
-  const handleLogMedication = (id: string) => {
-    setSchedule((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const nextStatus = item.status === 'TAKEN' ? 'DUE_SOON' : 'TAKEN';
-          return { ...item, status: nextStatus };
-        }
-        return item;
-      })
-    );
-  };
+  const progressPercent = totalCount > 0 ? Math.min(Math.round((takenCount / totalCount) * 100), 100) : 0;
 
   const handleAddMedication = () => {
-    router.push('/reminder-setup');
+    router.push({
+      pathname: '/reminder-setup',
+      params: { from: '/medication-schedule' },
+    });
   };
 
-  const renderCard = (item: MedicationScheduleItem) => {
+  const handleCardPress = (item: ScheduleItem) => {
+    if (item.status === 'MISSED') {
+      // Red MISSED card opens Missed Dose
+      router.push({
+        pathname: '/missed-dose',
+        params: { id: item.id, from: '/medication-schedule' },
+      });
+    } else if (item.status === 'DUE_SOON') {
+      // DUE SOON card opens Mark as Taken
+      router.push({
+        pathname: '/mark-as-taken',
+        params: { id: item.id, from: '/medication-schedule' },
+      });
+    } else {
+      // Tapping other cards (e.g. TAKEN) opens Reminder Setup (edit)
+      router.push({
+        pathname: '/reminder-setup',
+        params: { id: item.id, from: '/medication-schedule' },
+      });
+    }
+  };
+
+  const handleLogPress = (item: ScheduleItem) => {
+    router.push({
+      pathname: '/mark-as-taken',
+      params: { id: item.id, from: '/medication-schedule' },
+    });
+  };
+
+  const renderCard = (item: ScheduleItem) => {
     const isMissed = item.status === 'MISSED';
     const isDueSoon = item.status === 'DUE_SOON';
     const isTaken = item.status === 'TAKEN';
+    const isSkipped = item.status === 'SKIPPED';
+    const isUpcoming = item.status === 'UPCOMING';
 
     return (
-      <View
+      <TouchableOpacity
         key={item.id}
-        style={[styles.card, isMissed && styles.cardMissed]}>
+        style={[
+          styles.card,
+          isMissed && styles.cardMissed,
+          isTaken && styles.cardTaken,
+        ]}
+        onPress={() => handleCardPress(item)}
+        activeOpacity={0.75}>
         {/* Left Icon Container */}
         <View
           style={[
             styles.iconContainer,
-            isMissed ? styles.iconContainerMissed : styles.iconContainerNormal,
+            isMissed
+              ? styles.iconContainerMissed
+              : isTaken
+              ? styles.iconContainerTaken
+              : styles.iconContainerNormal,
           ]}>
           {item.iconType === 'water' ? (
             <Ionicons
@@ -150,8 +126,15 @@ export default function MedicationScheduleScreen() {
 
             {isDueSoon && (
               <View style={styles.dueSoonBadge}>
-                <Ionicons name="time-outline" size={13} color="#10B981" />
+                <Ionicons name="time-outline" size={13} color="#059669" />
                 <Text style={styles.dueSoonText}>DUE SOON</Text>
+              </View>
+            )}
+
+            {isUpcoming && (
+              <View style={styles.upcomingBadge}>
+                <Ionicons name="calendar-outline" size={13} color="#2563EB" />
+                <Text style={styles.upcomingText}>UPCOMING</Text>
               </View>
             )}
 
@@ -159,6 +142,13 @@ export default function MedicationScheduleScreen() {
               <View style={styles.missedRow}>
                 <Ionicons name="alert-circle" size={15} color={Colors.light.alert} />
                 <Text style={styles.missedText}>MISSED</Text>
+              </View>
+            )}
+
+            {isSkipped && (
+              <View style={styles.skippedBadge}>
+                <Ionicons name="close" size={13} color="#64748B" />
+                <Text style={styles.skippedText}>SKIPPED</Text>
               </View>
             )}
 
@@ -170,29 +160,28 @@ export default function MedicationScheduleScreen() {
         {isDueSoon && (
           <TouchableOpacity
             style={styles.logButton}
-            onPress={() => handleLogMedication(item.id)}
-            activeOpacity={0.8}>
+            onPress={(e) => {
+              e.stopPropagation();
+              handleLogPress(item);
+            }}
+            activeOpacity={0.75}>
             <Text style={styles.logButtonText}>Log</Text>
           </TouchableOpacity>
         )}
-      </View>
+      </TouchableOpacity>
     );
   };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      {/* Hide Expo Router's auto tabs to use our matching bottom nav */}
+      {/* Hide default headers for this screen */}
+      <Stack.Screen options={{ headerShown: false }} />
       <Tabs.Screen options={{ tabBarStyle: { display: 'none' }, headerShown: false }} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
         <View style={styles.wrapper}>
-          {/* Top Screen Title */}
-          <View style={styles.titleContainer}>
-            <Text style={styles.screenTitle}>Medication Schedule</Text>
-          </View>
-
           {/* Dark Forest Green Header Banner */}
           <View style={styles.darkBanner}>
             <View style={styles.bannerTopRow}>
@@ -203,7 +192,9 @@ export default function MedicationScheduleScreen() {
               <TouchableOpacity
                 style={styles.addFab}
                 onPress={handleAddMedication}
-                activeOpacity={0.85}>
+                activeOpacity={0.75}
+                accessibilityLabel="Add Reminder"
+                accessibilityRole="button">
                 <Ionicons name="add" size={28} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
@@ -213,7 +204,7 @@ export default function MedicationScheduleScreen() {
               <View style={styles.progressLabelRow}>
                 <Text style={styles.progressLabel}>Daily Progress</Text>
                 <Text style={styles.progressFraction}>
-                  {displayTaken}/{totalCount} Taken
+                  {takenCount}/{totalCount} Taken
                 </Text>
               </View>
               <View style={styles.progressBarTrack}>
@@ -229,32 +220,59 @@ export default function MedicationScheduleScreen() {
 
           {/* Schedule Groups */}
           <View style={styles.scheduleBody}>
-            {/* Morning Group */}
-            <View style={styles.groupSection}>
-              <View style={styles.groupHeaderRow}>
-                <Ionicons name="sunny-outline" size={17} color="#4A6054" />
-                <Text style={styles.groupHeaderText}>MORNING</Text>
+            {totalCount === 0 ? (
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconCircle}>
+                  <MaterialCommunityIcons name="pill-off" size={38} color="#10B981" />
+                </View>
+                <Text style={styles.emptyTitle}>No Medications Scheduled</Text>
+                <Text style={styles.emptySubtitle}>
+                  You don't have any medication reminders scheduled for today. Tap the "+" button above to add one.
+                </Text>
+                <TouchableOpacity
+                  style={styles.emptyAddButton}
+                  onPress={handleAddMedication}
+                  activeOpacity={0.8}>
+                  <Ionicons name="add" size={20} color="#FFFFFF" />
+                  <Text style={styles.emptyAddButtonText}>Add Medication</Text>
+                </TouchableOpacity>
               </View>
-              {morningItems.map(renderCard)}
-            </View>
+            ) : (
+              <>
+                {/* Morning Group */}
+                {morningItems.length > 0 && (
+                  <View style={styles.groupSection}>
+                    <View style={styles.groupHeaderRow}>
+                      <Ionicons name="sunny-outline" size={17} color="#4A6054" />
+                      <Text style={styles.groupHeaderText}>MORNING</Text>
+                    </View>
+                    {morningItems.map(renderCard)}
+                  </View>
+                )}
 
-            {/* Afternoon Group */}
-            <View style={styles.groupSection}>
-              <View style={styles.groupHeaderRow}>
-                <Ionicons name="partly-sunny-outline" size={17} color="#4A6054" />
-                <Text style={styles.groupHeaderText}>AFTERNOON</Text>
-              </View>
-              {afternoonItems.map(renderCard)}
-            </View>
+                {/* Afternoon Group */}
+                {afternoonItems.length > 0 && (
+                  <View style={styles.groupSection}>
+                    <View style={styles.groupHeaderRow}>
+                      <Ionicons name="partly-sunny-outline" size={17} color="#4A6054" />
+                      <Text style={styles.groupHeaderText}>AFTERNOON</Text>
+                    </View>
+                    {afternoonItems.map(renderCard)}
+                  </View>
+                )}
 
-            {/* Evening Group */}
-            <View style={styles.groupSection}>
-              <View style={styles.groupHeaderRow}>
-                <Ionicons name="moon-outline" size={17} color="#4A6054" />
-                <Text style={styles.groupHeaderText}>EVENING</Text>
-              </View>
-              {eveningItems.map(renderCard)}
-            </View>
+                {/* Evening Group */}
+                {eveningItems.length > 0 && (
+                  <View style={styles.groupSection}>
+                    <View style={styles.groupHeaderRow}>
+                      <Ionicons name="moon-outline" size={17} color="#4A6054" />
+                      <Text style={styles.groupHeaderText}>EVENING</Text>
+                    </View>
+                    {eveningItems.map(renderCard)}
+                  </View>
+                )}
+              </>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -263,36 +281,36 @@ export default function MedicationScheduleScreen() {
       <View style={styles.bottomNavContainer}>
         <View style={styles.bottomNavRow}>
           <Pressable
-            style={styles.navItem}
-            onPress={() => router.push('/')}>
+            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
+            onPress={() => router.navigate({ pathname: '/medication-schedule' })}>
             <Ionicons name="grid-outline" size={22} color={Colors.light.tabInactive} />
             <Text style={styles.navLabel}>Dashboard</Text>
           </Pressable>
 
           <Pressable
-            style={styles.navItem}
-            onPress={() => router.push('/patients')}>
+            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
+            onPress={() => router.push({ pathname: '/patients' })}>
             <Ionicons name="people-outline" size={22} color={Colors.light.tabInactive} />
             <Text style={styles.navLabel}>Patients</Text>
           </Pressable>
 
           <Pressable
-            style={styles.navItem}
-            onPress={() => router.push('/reports')}>
+            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
+            onPress={() => router.push({ pathname: '/adherence' })}>
             <Ionicons name="stats-chart-outline" size={22} color={Colors.light.tabInactive} />
             <Text style={styles.navLabel}>Reports</Text>
           </Pressable>
 
           <Pressable
-            style={styles.navItem}
-            onPress={() => router.push('/alerts')}>
+            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
+            onPress={() => router.push({ pathname: '/alerts' })}>
             <Ionicons name="notifications" size={22} color={Colors.light.accent} />
             <Text style={[styles.navLabel, styles.navLabelActive]}>Alerts</Text>
           </Pressable>
 
           <Pressable
-            style={styles.navItem}
-            onPress={() => router.push('/profile')}>
+            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
+            onPress={() => router.push({ pathname: '/profile' })}>
             <Ionicons name="person-outline" size={22} color={Colors.light.tabInactive} />
             <Text style={styles.navLabel}>Profile</Text>
           </Pressable>
@@ -308,34 +326,23 @@ export default function MedicationScheduleScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F3FAF7',
+    backgroundColor: '#1E3228', // Matches dark banner for seamless top edge
   },
   scrollContent: {
     paddingBottom: 24,
     alignItems: 'center',
     backgroundColor: '#F3FAF7',
+    minHeight: '100%',
   },
   wrapper: {
     width: '100%',
     maxWidth: MaxContentWidth,
   },
-  titleContainer: {
-    backgroundColor: '#F3FAF7',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    alignItems: 'flex-start',
-  },
-  screenTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#94A3B8',
-    letterSpacing: -0.2,
-  },
   darkBanner: {
     backgroundColor: '#1E3228',
     paddingHorizontal: 20,
     paddingTop: 24,
-    paddingBottom: 22,
+    paddingBottom: 24,
   },
   bannerTopRow: {
     flexDirection: 'row',
@@ -401,16 +408,68 @@ const styles = StyleSheet.create({
   },
   scheduleBody: {
     paddingHorizontal: 16,
-    paddingTop: 18,
+    paddingTop: 22,
+  },
+  emptyContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 18,
+    borderWidth: 1,
+    borderColor: '#E6EFE9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#E6F4EE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  emptyAddButton: {
+    backgroundColor: '#2BB673',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  emptyAddButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
   groupSection: {
-    marginBottom: 18,
+    marginBottom: 24,
   },
   groupHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 10,
+    marginBottom: 12,
     paddingHorizontal: 4,
   },
   groupHeaderText: {
@@ -422,17 +481,21 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
-    padding: 14,
-    marginBottom: 10,
+    padding: 16,
+    marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E6EFE9',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardTaken: {
+    backgroundColor: '#F0F9F5',
+    borderColor: '#D4EADF',
   },
   cardMissed: {
     backgroundColor: '#FFF5F5',
@@ -445,10 +508,13 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   iconContainerNormal: {
     backgroundColor: '#E6F4EE',
+  },
+  iconContainerTaken: {
+    backgroundColor: '#E2F4EB',
   },
   iconContainerMissed: {
     backgroundColor: '#FFFFFF',
@@ -507,6 +573,22 @@ const styles = StyleSheet.create({
     color: '#059669',
     letterSpacing: 0.4,
   },
+  upcomingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 4,
+    marginRight: 8,
+  },
+  upcomingText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#2563EB',
+    letterSpacing: 0.4,
+  },
   missedRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -517,6 +599,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: Colors.light.alert,
+    letterSpacing: 0.4,
+  },
+  skippedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 3,
+    marginRight: 8,
+  },
+  skippedText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
     letterSpacing: 0.4,
   },
   nextText: {
@@ -554,6 +652,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 4,
     paddingHorizontal: 12,
+  },
+  navItemPressed: {
+    opacity: 0.6,
   },
   navLabel: {
     fontSize: 10,

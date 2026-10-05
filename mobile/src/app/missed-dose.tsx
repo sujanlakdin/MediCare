@@ -6,23 +6,27 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, Tabs, Stack } from 'expo-router';
+import { useRouter, Tabs, Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, MaxContentWidth } from '@/constants/theme';
+import { useMedicareStore, markSkipped } from '@/medicare';
 
 export default function MissedDoseScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ id?: string; medicationId?: string; from?: string }>();
+  const medId = params.id || params.medicationId;
 
-  // Mock data as requested
-  const medication = {
-    name: 'Metformin',
-    dosage: '500mg Tablet',
-    scheduledTime: '08:00 AM',
-    status: '3h 15m late',
-  };
+  const { medications, reminders } = useMedicareStore();
+
+  const currentMed =
+    medications.find((m) => m.id === medId) ||
+    medications.find((m) => m.name === 'Atorvastatin') ||
+    medications.find((m) => m.name === 'Metformin') ||
+    medications[0];
+
+  const currentReminder = reminders.find((r) => r.medicationId === currentMed?.id);
 
   const handleHelpPress = () => {
     Alert.alert(
@@ -32,44 +36,39 @@ export default function MissedDoseScreen() {
   };
 
   const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.push('/medication-schedule' as any);
-    }
+    router.navigate({ pathname: '/medication-schedule' });
   };
 
   const handleLogTaken = () => {
-    router.push('/mark-as-taken' as any);
-  };
-
-  const handleSkipDose = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.push('/medication-schedule' as any);
+    if (currentMed) {
+      router.push({
+        pathname: '/mark-as-taken',
+        params: { id: currentMed.id, from: '/missed-dose' },
+      });
     }
   };
 
+  const handleSkipDose = async () => {
+    if (currentMed) {
+      await markSkipped(currentMed.id);
+    }
+    router.navigate({ pathname: '/medication-schedule' });
+  };
+
   const handleReschedule = () => {
-    router.push('/reminder-setup' as any);
+    if (currentMed) {
+      router.push({
+        pathname: '/reminder-setup',
+        params: { id: currentMed.id, from: '/missed-dose' },
+      });
+    }
   };
 
   const handleContactCareTeam = () => {
     Alert.alert(
       'Contact Care Team',
-      'Would you like to connect with Dr. Sarah Jenkins (Primary Care)?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Call Care Team',
-          onPress: () => {
-            Linking.openURL('tel:+15550192831').catch(() => {
-              Alert.alert('Phone Service Unavailable', 'Unable to initiate call on this device.');
-            });
-          },
-        },
-      ]
+      'Please call Dr. Sarah Jenkins (Primary Care) at (555) 019-2831 for questions regarding your missed dose.',
+      [{ text: 'OK' }]
     );
   };
 
@@ -116,20 +115,22 @@ export default function MissedDoseScreen() {
                 <MaterialCommunityIcons name="alert" size={24} color="#FFFFFF" />
               </View>
               <View style={styles.missedCardTitleContainer}>
-                <Text style={styles.medicationName}>{medication.name}</Text>
-                <Text style={styles.medicationDosage}>{medication.dosage}</Text>
+                <Text style={styles.medicationName}>{currentMed?.name || 'Medication'}</Text>
+                <Text style={styles.medicationDosage}>{currentMed?.dose || 'Dose'}</Text>
               </View>
             </View>
 
             <View style={styles.missedCardDetails}>
               <View style={styles.detailCol}>
                 <Text style={styles.detailLabel}>SCHEDULED</Text>
-                <Text style={styles.detailValue}>{medication.scheduledTime}</Text>
+                <Text style={styles.detailValue}>
+                  {currentReminder?.time || '08:00 AM'}
+                </Text>
               </View>
               <View style={[styles.detailCol, styles.alignRight]}>
                 <Text style={[styles.detailLabel, styles.alignRight]}>STATUS</Text>
                 <Text style={[styles.detailValueStatus, styles.alignRight]}>
-                  {medication.status}
+                  Missed dose
                 </Text>
               </View>
             </View>
@@ -154,8 +155,9 @@ export default function MissedDoseScreen() {
             <Text style={styles.sectionHeading}>Instructions for Missed Dose</Text>
             <View style={styles.instructionCard}>
               <Text style={styles.instructionText}>
-                If you miss a dose, take it as soon as you remember. However, if it is almost time
-                for your next dose, skip the missed dose and go back to your regular schedule.
+                {currentMed?.instructions
+                  ? `${currentMed.instructions}. If you miss a dose, take it as soon as you remember. However, if it is almost time for your next dose, skip the missed dose and go back to your regular schedule.`
+                  : 'If you miss a dose, take it as soon as you remember. However, if it is almost time for your next dose, skip the missed dose and go back to your regular schedule.'}
               </Text>
             </View>
           </View>
