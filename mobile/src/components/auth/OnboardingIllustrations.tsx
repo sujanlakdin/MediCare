@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import Svg, {
   Path,
   Rect,
@@ -7,13 +7,7 @@ import Svg, {
   G,
   Line,
   Text as SvgText,
-  Defs,
-  LinearGradient,
-  Stop,
 } from 'react-native-svg';
-
-const { width } = Dimensions.get('window');
-const ART_SIZE = Math.min(width * 0.78, 300);
 
 const COLORS = {
   brand: '#006A4E',
@@ -23,24 +17,33 @@ const COLORS = {
   mintDark: '#CDEFE0',
   danger: '#C94A4A',
   white: '#FFFFFF',
-  cardBg: '#FFFFFF',
   subtle: '#94A3B8',
 };
 
+interface IllustrationProps {
+  size?: number;
+}
+
 /**
  * Slide 1 Illustration: "Never Miss a Dose"
- * Features: Soft mint backdrop blob, medicine bottle, reminder bell with red dot,
- * analog clock showing reminder time, two-tone capsule, and decorative botanical leaves.
+ * Artwork elements:
+ * - Pill bottle with green medical cross
+ * - Reminder bell with vibrant red dot
+ * - Analog clock pointing to 8:00
+ * - Two-tone capsule pill
+ * - Plant leaves around base
+ * - Soft mint organic blob backdrop
  */
-export function DoseReminderIllustration() {
+export function DoseReminderIllustration({ size = 280 }: IllustrationProps) {
+  const artHeight = size * 0.9;
   return (
     <View style={styles.container}>
       <Svg
-        width={ART_SIZE}
-        height={ART_SIZE * 0.92}
+        width={size}
+        height={artHeight}
         viewBox="0 0 320 280"
         accessibilityRole="image"
-        accessibilityLabel="Medicine bottle, clock, and reminder bell illustration"
+        accessibilityLabel="Slide 1: Pill bottle, reminder bell, clock, capsule, and leaves"
       >
         {/* Soft mint backdrop blob */}
         <Path
@@ -66,7 +69,6 @@ export function DoseReminderIllustration() {
         />
 
         {/* Medicine / Pill Bottle (Center-Left) */}
-        {/* Bottle Body */}
         <Rect
           x="75"
           y="110"
@@ -111,7 +113,7 @@ export function DoseReminderIllustration() {
           fill={COLORS.accent}
         />
 
-        {/* Clock (Top-Right) */}
+        {/* Analog Clock (Top-Right) showing 8:00 */}
         <Circle cx="215" cy="115" r="42" fill={COLORS.white} stroke={COLORS.mintDark} strokeWidth="3" />
         <Circle cx="215" cy="115" r="36" fill="#F8FCFA" />
         {/* Hour markers */}
@@ -145,7 +147,7 @@ export function DoseReminderIllustration() {
             d="M12,4 L36,4 C42.6,4 48,9.4 48,16 C48,22.6 42.6,28 36,28 L12,28 C5.4,28 0,22.6 0,16 C0,9.4 5.4,4 12,4 Z"
             fill={COLORS.deep}
           />
-          {/* Right half - mint/white */}
+          {/* Right half - accent green */}
           <Path
             d="M24,4 L36,4 C42.6,4 48,9.4 48,16 C48,22.6 42.6,28 36,28 L24,28 Z"
             fill={COLORS.accent}
@@ -159,18 +161,22 @@ export function DoseReminderIllustration() {
 
 /**
  * Slide 2 Illustration: "Track Your Adherence"
- * Features: White progress card with "85%" & bar chart, big green heart with
- * a crisp pulse line, and a green verified badge.
+ * Artwork elements:
+ * - White card with "85%" adherence and 4-bar chart
+ * - Big green heart with white pulse / ECG line
+ * - Green verified tick badge
+ * - Soft mint organic blob backdrop
  */
-export function AdherenceTrackerIllustration() {
+export function AdherenceTrackerIllustration({ size = 280 }: IllustrationProps) {
+  const artHeight = size * 0.9;
   return (
     <View style={styles.container}>
       <Svg
-        width={ART_SIZE}
-        height={ART_SIZE * 0.92}
+        width={size}
+        height={artHeight}
         viewBox="0 0 320 280"
         accessibilityRole="image"
-        accessibilityLabel="Adherence statistics card with 85% score, heart pulse, and check badge"
+        accessibilityLabel="Slide 2: 85% adherence card, bar chart, heart pulse line, and tick badge"
       >
         {/* Soft mint backdrop blob */}
         <Path
@@ -219,13 +225,9 @@ export function AdherenceTrackerIllustration() {
         </SvgText>
 
         {/* Mini 4-Bar Chart */}
-        {/* Bar 1 */}
         <Rect x="72" y="172" width="16" height="26" rx="5" fill={COLORS.accent} />
-        {/* Bar 2 */}
         <Rect x="94" y="162" width="16" height="36" rx="5" fill={COLORS.brand} />
-        {/* Bar 3 */}
         <Rect x="116" y="152" width="16" height="46" rx="5" fill={COLORS.brand} />
-        {/* Bar 4 */}
         <Rect x="138" y="168" width="16" height="30" rx="5" fill={COLORS.accent} />
 
         {/* Big Green Heart with Pulse Line (Right Side) */}
@@ -279,18 +281,23 @@ export function AdherenceTrackerIllustration() {
 
 /**
  * Slide 3 Illustration: "Stay Connected with Caregivers"
- * Features: Elderly patient and caregiver holding hands in supportive companionship,
- * floating coral heart above them, alert-bell bubble and pill bubble.
+ * Artwork elements:
+ * - Elderly patient and caregiver holding hands
+ * - Floating coral heart above them
+ * - Alert-bell bubble
+ * - Pill bubble
+ * - Soft mint organic blob backdrop
  */
-export function CaregiverConnectionIllustration() {
+export function CaregiverConnectionIllustration({ size = 280 }: IllustrationProps) {
+  const artHeight = size * 0.9;
   return (
     <View style={styles.container}>
       <Svg
-        width={ART_SIZE}
-        height={ART_SIZE * 0.92}
+        width={size}
+        height={artHeight}
         viewBox="0 0 320 280"
         accessibilityRole="image"
-        accessibilityLabel="Caregiver and patient holding hands with alert bell and medicine bubbles"
+        accessibilityLabel="Slide 3: Elderly patient and caregiver holding hands, coral heart, and alert bubbles"
       >
         {/* Soft mint backdrop blob */}
         <Path
@@ -314,7 +321,6 @@ export function CaregiverConnectionIllustration() {
         {/* Floating Alert-Bell Bubble (Top Left) */}
         <G transform="translate(42, 65)">
           <Circle cx="22" cy="22" r="22" fill={COLORS.white} stroke={COLORS.mintDark} strokeWidth="2" />
-          {/* Bell Icon */}
           <Path
             d="M18,12 C18,10 19,8 22,8 C25,8 26,10 26,12 C30,14 32,18 32,23 L34,28 L10,28 L12,23 C12,18 14,14 18,12 Z"
             fill={COLORS.danger}
@@ -325,7 +331,6 @@ export function CaregiverConnectionIllustration() {
         {/* Floating Pill Bubble (Top Right) */}
         <G transform="translate(245, 75)">
           <Circle cx="22" cy="22" r="22" fill={COLORS.white} stroke={COLORS.mintDark} strokeWidth="2" />
-          {/* Pill Capsule */}
           <G transform="translate(12, 14) rotate(-35)">
             <Rect x="0" y="0" width="12" height="18" rx="6" fill={COLORS.brand} />
             <Rect x="0" y="9" width="12" height="9" rx="0" fill={COLORS.accent} />
@@ -333,9 +338,7 @@ export function CaregiverConnectionIllustration() {
         </G>
 
         {/* Left Character: Elderly Patient */}
-        {/* Head */}
         <Circle cx="118" cy="115" r="20" fill="#E2BA9E" />
-        {/* Hair (soft grey/white curly hair) */}
         <Path
           d="M98,115 C98,100 106,90 120,90 C134,90 140,100 140,112 C135,108 128,106 122,108 C115,108 108,110 98,115 Z"
           fill="#D4DED9"
@@ -344,12 +347,12 @@ export function CaregiverConnectionIllustration() {
         <Circle cx="112" cy="116" r="5" fill="none" stroke={COLORS.brand} strokeWidth="1.8" />
         <Circle cx="124" cy="116" r="5" fill="none" stroke={COLORS.brand} strokeWidth="1.8" />
         <Line x1="117" y1="116" x2="119" y2="116" stroke={COLORS.brand} strokeWidth="1.8" />
-        {/* Body (Soft teal/mint sweater) */}
+        {/* Body */}
         <Path
           d="M96,145 C96,135 106,132 120,132 C134,132 142,135 142,145 L145,215 L92,215 Z"
           fill={COLORS.accent}
         />
-        {/* Walking Cane (Left hand support) */}
+        {/* Walking Cane */}
         <Path
           d="M86,170 C86,160 76,160 76,168 L76,230"
           fill="none"
@@ -359,15 +362,13 @@ export function CaregiverConnectionIllustration() {
         />
 
         {/* Right Character: Caring Caregiver */}
-        {/* Head */}
         <Circle cx="195" cy="108" r="19" fill="#F0C5AC" />
-        {/* Hair (neat dark ponytail) */}
         <Path
           d="M178,108 C178,94 186,86 198,86 C212,86 218,96 216,112 C210,106 200,104 195,106 Z"
           fill={COLORS.deep}
         />
         <Circle cx="217" cy="116" r="7" fill={COLORS.deep} />
-        {/* Body (Brand green caregiver scrubs) */}
+        {/* Body */}
         <Path
           d="M172,138 C172,128 182,125 196,125 C210,125 220,128 220,138 L224,215 L170,215 Z"
           fill={COLORS.brand}
@@ -381,7 +382,7 @@ export function CaregiverConnectionIllustration() {
           strokeWidth="6"
           strokeLinecap="round"
         />
-        {/* Caregiver supportive arm sleeve */}
+        {/* Caregiver supportive arm */}
         <Path
           d="M190,140 C175,152 165,165 162,175"
           fill="none"
@@ -389,7 +390,7 @@ export function CaregiverConnectionIllustration() {
           strokeWidth="9"
           strokeLinecap="round"
         />
-        {/* Patient arm sleeve */}
+        {/* Patient arm */}
         <Path
           d="M125,140 C132,152 135,162 138,172"
           fill="none"
@@ -398,11 +399,27 @@ export function CaregiverConnectionIllustration() {
           strokeLinecap="round"
         />
 
-        {/* Ground grounding baseline */}
+        {/* Ground baseline */}
         <Line x1="60" y1="230" x2="260" y2="230" stroke={COLORS.mintDark} strokeWidth="3" strokeLinecap="round" />
       </Svg>
     </View>
   );
+}
+
+/**
+ * Helper to render the distinct illustration for each slide index
+ */
+export function OnboardingIllustration({ index, size = 280 }: { index: number; size?: number }) {
+  switch (index) {
+    case 0:
+      return <DoseReminderIllustration size={size} />;
+    case 1:
+      return <AdherenceTrackerIllustration size={size} />;
+    case 2:
+      return <CaregiverConnectionIllustration size={size} />;
+    default:
+      return <DoseReminderIllustration size={size} />;
+  }
 }
 
 const styles = StyleSheet.create({

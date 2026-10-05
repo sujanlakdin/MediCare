@@ -5,7 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  Dimensions,
+  useWindowDimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
   StatusBar,
@@ -20,36 +20,34 @@ import {
   CaregiverConnectionIllustration,
 } from '../../components/auth/OnboardingIllustrations';
 
-const { width } = Dimensions.get('window');
-
-interface SlideItem {
+export interface OnboardingSlideItem {
   id: string;
+  index: number;
   title: string;
   description: string;
-  Illustration: React.ComponentType;
 }
 
-const SLIDES: SlideItem[] = [
+const ONBOARDING_SLIDES: OnboardingSlideItem[] = [
   {
-    id: '1',
+    id: 'slide-dose-reminders',
+    index: 0,
     title: 'Never Miss a Dose',
     description:
       'Get gentle, timely reminders for every medicine, so taking your pills on time becomes simple and stress-free.',
-    Illustration: DoseReminderIllustration,
   },
   {
-    id: '2',
+    id: 'slide-track-adherence',
+    index: 1,
     title: 'Track Your Adherence',
     description:
       'See how well you follow your treatment each day and week, and celebrate your progress along the way.',
-    Illustration: AdherenceTrackerIllustration,
   },
   {
-    id: '3',
+    id: 'slide-connect-caregivers',
+    index: 2,
     title: 'Stay Connected with Caregivers',
     description:
       'Link a family member or caregiver who is alerted when a dose is missed, and get help fast in an emergency.',
-    Illustration: CaregiverConnectionIllustration,
   },
 ];
 
@@ -60,22 +58,25 @@ const RADIUS = (RING_SIZE - STROKE_WIDTH) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 export default function OnboardingScreen() {
+  const { width: windowWidth } = useWindowDimensions();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList<SlideItem>>(null);
+  const flatListRef = useRef<FlatList<OnboardingSlideItem>>(null);
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offsetX = event.nativeEvent.contentOffset.x;
-      const index = Math.round(offsetX / width);
-      if (index >= 0 && index < SLIDES.length && index !== currentIndex) {
-        setCurrentIndex(index);
+      if (windowWidth > 0) {
+        const index = Math.round(offsetX / windowWidth);
+        if (index >= 0 && index < ONBOARDING_SLIDES.length && index !== currentIndex) {
+          setCurrentIndex(index);
+        }
       }
     },
-    [currentIndex]
+    [currentIndex, windowWidth]
   );
 
   const handleNext = () => {
-    if (currentIndex < SLIDES.length - 1) {
+    if (currentIndex < ONBOARDING_SLIDES.length - 1) {
       const nextIndex = currentIndex + 1;
       flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
       setCurrentIndex(nextIndex);
@@ -88,22 +89,43 @@ export default function OnboardingScreen() {
     router.replace('/welcome' as any);
   };
 
+  const isLastSlide = currentIndex === ONBOARDING_SLIDES.length - 1;
+
   // Progress is 1/3, 2/3, 3/3 (1.0)
-  const progress = (currentIndex + 1) / SLIDES.length;
+  const progress = (currentIndex + 1) / ONBOARDING_SLIDES.length;
   const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
 
-  const isLastSlide = currentIndex === SLIDES.length - 1;
+  /**
+   * Render distinct illustration based on the specific slide index
+   */
+  const renderSlideIllustration = (index: number) => {
+    switch (index) {
+      case 0:
+        return <DoseReminderIllustration size={Math.min(windowWidth * 0.76, 290)} />;
+      case 1:
+        return <AdherenceTrackerIllustration size={Math.min(windowWidth * 0.76, 290)} />;
+      case 2:
+        return <CaregiverConnectionIllustration size={Math.min(windowWidth * 0.76, 290)} />;
+      default:
+        return <DoseReminderIllustration size={Math.min(windowWidth * 0.76, 290)} />;
+    }
+  };
 
-  const renderSlide = ({ item }: { item: SlideItem }) => {
-    const { Illustration } = item;
+  const renderSlide = ({
+    item,
+    index,
+  }: {
+    item: OnboardingSlideItem;
+    index: number;
+  }) => {
     return (
-      <View style={styles.slideContainer}>
-        {/* Upper illustration area */}
+      <View style={[styles.slideContainer, { width: windowWidth }]} key={item.id}>
+        {/* Upper distinct illustration area */}
         <View style={styles.illustrationWrapper}>
-          <Illustration />
+          {renderSlideIllustration(index)}
         </View>
 
-        {/* Text information area */}
+        {/* Text information area showing slide's unique title and description */}
         <View style={styles.textContainer}>
           <Text
             style={styles.title}
@@ -120,18 +142,31 @@ export default function OnboardingScreen() {
     );
   };
 
+  const getItemLayout = (_: any, index: number) => ({
+    length: windowWidth,
+    offset: windowWidth * index,
+    index,
+  });
+
   return (
     <SafeAreaView style={styles.safeContainer} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Swipeable Slides */}
+      {/* Swipeable Slides FlatList */}
       <FlatList
         ref={flatListRef}
-        data={SLIDES}
+        data={ONBOARDING_SLIDES}
         renderItem={renderSlide}
         keyExtractor={(item) => item.id}
         horizontal
         pagingEnabled
+        snapToInterval={windowWidth}
+        snapToAlignment="center"
+        decelerationRate="fast"
+        getItemLayout={getItemLayout}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        windowSize={3}
         showsHorizontalScrollIndicator={false}
         bounces={false}
         onScroll={handleScroll}
@@ -145,9 +180,9 @@ export default function OnboardingScreen() {
         <View
           style={styles.dotsRow}
           accessible={true}
-          accessibilityLabel={`Step ${currentIndex + 1} of ${SLIDES.length}`}
+          accessibilityLabel={`Slide ${currentIndex + 1} of ${ONBOARDING_SLIDES.length}`}
         >
-          {SLIDES.map((_, i) => {
+          {ONBOARDING_SLIDES.map((_, i) => {
             const isActive = i === currentIndex;
             return (
               <View
@@ -241,7 +276,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   slideContainer: {
-    width,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,
@@ -271,7 +305,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     color: '#475569',
     textAlign: 'center',
-    maxWidth: 310,
+    maxWidth: 320,
   },
   controlsContainer: {
     alignItems: 'center',
@@ -318,10 +352,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#006A4E',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#006A4E',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
     elevation: 6,
   },
   skipButton: {
