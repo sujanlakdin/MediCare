@@ -104,7 +104,7 @@ export default function MedicationFormScreen() {
         setEnd(existing.end || '');
         setStock(String(existing.stock ?? 30));
         setAlert(existing.alert !== undefined ? existing.alert : true);
-        setImage(existing.image);
+        setImage(existing.image || '');
       }
     }
   }, [editId, medications]);
@@ -220,7 +220,7 @@ export default function MedicationFormScreen() {
           end: end.trim(),
           stock: stockNumber,
           alert,
-          image,
+          image: image || '',
         });
         showToast('Medication updated');
         setTimeout(() => {
@@ -240,7 +240,7 @@ export default function MedicationFormScreen() {
           end: end.trim(),
           stock: stockNumber,
           alert,
-          image,
+          image: image || '',
         });
         showToast('Medication added');
         setTimeout(() => {
@@ -317,7 +317,10 @@ export default function MedicationFormScreen() {
           </View>
 
           {/* Medication Photo Picker */}
-          <MedicationImagePicker value={image} onChange={setImage} />
+          <MedicationImagePicker
+            value={image}
+            onChange={(uri) => setImage(uri || '')}
+          />
 
           {/* 1. Medicine Name (Required) */}
           <Text style={styles.fieldLabel} allowFontScaling={true}>

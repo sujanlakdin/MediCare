@@ -80,6 +80,40 @@ let localMeds = [
 const isDbConnected = () => mongoose.connection.readyState === 1;
 
 /**
+ * Safely find medication document by ObjectId, string id, or name without throwing CastError
+ */
+async function findMedicationDoc(id) {
+  if (!id) return null;
+  const idStr = String(id).trim();
+
+  // 1. Try standard 24-hex ObjectId if valid
+  if (mongoose.Types.ObjectId.isValid(idStr)) {
+    try {
+      const doc = await Medication.findById(idStr);
+      if (doc) return doc;
+    } catch (e) {
+      // Ignore cast errors
+    }
+  }
+
+  // 2. Try lookup by name or custom id fallback
+  try {
+    const doc = await Medication.findOne({
+      $or: [
+        ...(mongoose.Types.ObjectId.isValid(idStr) ? [{ _id: idStr }] : []),
+        { name: idStr },
+        { name: new RegExp(`^${idStr}$`, "i") },
+      ],
+    });
+    if (doc) return doc;
+  } catch (e) {
+    // Ignore errors
+  }
+
+  return null;
+}
+
+/**
  * GET /api/medications
  * Retrieve all patient medications from MongoDB.
  */
@@ -89,7 +123,11 @@ exports.getMedications = async (req, res) => {
       let medications = await Medication.find().sort({ createdAt: -1 });
 
       if (medications.length === 0) {
-        medications = await Medication.insertMany(localMeds);
+        try {
+          medications = await Medication.insertMany(localMeds, { ordered: false });
+        } catch (insertErr) {
+          medications = await Medication.find().sort({ createdAt: -1 });
+        }
       }
 
       return res.status(200).json({
@@ -127,7 +165,7 @@ exports.getMedicationById = async (req, res) => {
     const id = req.params.id;
 
     if (isDbConnected()) {
-      const medication = await Medication.findById(id);
+      const medication = await findMedicationDoc(id);
       if (medication) {
         return res.status(200).json({
           success: true,
@@ -137,7 +175,7 @@ exports.getMedicationById = async (req, res) => {
       }
     }
 
-    const localFound = localMeds.find((m) => m._id === id || m.id === id);
+    const localFound = localMeds.find((m) => String(m._id) === String(id) || String(m.id) === String(id));
     if (!localFound) {
       return res.status(404).json({
         success: false,
@@ -145,13 +183,13 @@ exports.getMedicationById = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       source: "memory-store",
       data: localFound,
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Server error fetching medication details",
       error: error.message,
@@ -247,7 +285,7 @@ exports.createMedication = async (req, res) => {
 
 /**
  * PUT /api/medications/:id
- * Update existing medication details and preserve / update photo.
+ * Update existing medication details and preserve / update / remove photo.
  */
 exports.updateMedication = async (req, res) => {
   try {
@@ -255,10 +293,10 @@ exports.updateMedication = async (req, res) => {
     const updates = req.body;
 
     if (isDbConnected()) {
-      const medication = await Medication.findById(id);
+      const medication = await findMedicationDoc(id);
       if (medication) {
         if (updates.name !== undefined) medication.name = updates.name.trim();
-        if (updates.purpose !== undefined) medication.purpose = updates.purpose.trim();
+        if (updates.purpose !== undefined) medication.purpose = (updates.purpose || "").trim();
         if (updates.form !== undefined) medication.form = updates.form;
         if (updates.qty !== undefined) medication.qty = Math.max(1, Number(updates.qty) || 1);
         if (updates.meal !== undefined) medication.meal = updates.meal;
@@ -274,7 +312,10 @@ exports.updateMedication = async (req, res) => {
         if (updates.stock !== undefined) medication.stock = Math.max(0, Number(updates.stock) || 0);
         if (updates.alert !== undefined) medication.alert = Boolean(updates.alert);
         if (updates.taken !== undefined) medication.taken = updates.taken;
-        if (updates.image !== undefined) medication.image = updates.image;
+        // Photo Remove / Update:
+        if (updates.image !== undefined) {
+          medication.image = updates.image || "";
+        }
 
         const updated = await medication.save();
         return res.status(200).json({
@@ -286,7 +327,7 @@ exports.updateMedication = async (req, res) => {
       }
     }
 
-    const localIndex = localMeds.findIndex((m) => m._id === id || m.id === id);
+    const localIndex = localMeds.findIndex((m) => String(m._id) === String(id) || String(m.id) === String(id));
     if (localIndex === -1) {
       return res.status(404).json({
         success: false,
@@ -300,11 +341,11 @@ exports.updateMedication = async (req, res) => {
       ...updates,
       id,
       _id: id,
-      image: updates.image !== undefined ? updates.image : existing.image,
+      image: updates.image !== undefined ? (updates.image || "") : existing.image,
     };
     localMeds[localIndex] = updatedLocal;
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       source: "memory-store",
       message: "Medication updated successfully",
@@ -312,7 +353,7 @@ exports.updateMedication = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating medication:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to update medication",
       error: error.message,
@@ -322,26 +363,34 @@ exports.updateMedication = async (req, res) => {
 
 /**
  * DELETE /api/medications/:id
- * Remove a medication from MongoDB.
+ * Remove a medication from MongoDB Atlas.
  */
 exports.deleteMedication = async (req, res) => {
   try {
     const id = req.params.id;
 
     if (isDbConnected()) {
-      await Medication.findByIdAndDelete(id);
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        await Medication.findByIdAndDelete(id);
+      }
+      await Medication.deleteMany({
+        $or: [
+          ...(mongoose.Types.ObjectId.isValid(id) ? [{ _id: id }] : []),
+          { name: id },
+        ],
+      });
     }
 
-    localMeds = localMeds.filter((m) => m._id !== id && m.id !== id);
+    localMeds = localMeds.filter((m) => String(m._id) !== String(id) && String(m.id) !== String(id));
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Medication deleted successfully",
       id,
     });
   } catch (error) {
     console.error("Error deleting medication:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to delete medication",
       error: error.message,
@@ -366,7 +415,7 @@ exports.markDoseTaken = async (req, res) => {
     }
 
     if (isDbConnected()) {
-      const medication = await Medication.findById(id);
+      const medication = await findMedicationDoc(id);
       if (medication) {
         medication.taken.set(time, true);
         await medication.save();
@@ -379,7 +428,7 @@ exports.markDoseTaken = async (req, res) => {
       }
     }
 
-    const localIndex = localMeds.findIndex((m) => m._id === id || m.id === id);
+    const localIndex = localMeds.findIndex((m) => String(m._id) === String(id) || String(m.id) === String(id));
     if (localIndex !== -1) {
       localMeds[localIndex].taken = {
         ...localMeds[localIndex].taken,
@@ -393,13 +442,13 @@ exports.markDoseTaken = async (req, res) => {
       });
     }
 
-    res.status(404).json({
+    return res.status(404).json({
       success: false,
       message: "Medication not found",
     });
   } catch (error) {
     console.error("Error marking dose as taken:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to record dose",
       error: error.message,
@@ -416,7 +465,7 @@ exports.toggleAlert = async (req, res) => {
     const id = req.params.id;
 
     if (isDbConnected()) {
-      const medication = await Medication.findById(id);
+      const medication = await findMedicationDoc(id);
       if (medication) {
         medication.alert = !medication.alert;
         await medication.save();
@@ -429,7 +478,7 @@ exports.toggleAlert = async (req, res) => {
       }
     }
 
-    const localIndex = localMeds.findIndex((m) => m._id === id || m.id === id);
+    const localIndex = localMeds.findIndex((m) => String(m._id) === String(id) || String(m.id) === String(id));
     if (localIndex !== -1) {
       localMeds[localIndex].alert = !localMeds[localIndex].alert;
       return res.status(200).json({
@@ -440,13 +489,13 @@ exports.toggleAlert = async (req, res) => {
       });
     }
 
-    res.status(404).json({
+    return res.status(404).json({
       success: false,
       message: "Medication not found",
     });
   } catch (error) {
     console.error("Error toggling refill alert:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to toggle refill alert",
       error: error.message,

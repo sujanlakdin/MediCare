@@ -71,14 +71,45 @@ export default function MyProfileScreen({ navigation }) {
             try {
               navigation.navigate("Welcome");
             } catch (e) {
-              router.replace("/?route=Welcome");
+              router.replace("/(auth)/login");
             }
           } else {
-            router.replace("/?route=Welcome");
+            router.replace("/(auth)/login");
           }
         },
       },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete MediCare Account",
+      "Are you sure you want to permanently delete your account and personal medical profile? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Permanently",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await profileService.deleteProfile(user?._id || "current");
+              Alert.alert("Account Deleted", "Your MediCare account and profile have been permanently removed.");
+              if (navigation && navigation.navigate) {
+                try {
+                  navigation.navigate("Welcome");
+                } catch (e) {
+                  router.replace("/(auth)/login");
+                }
+              } else {
+                router.replace("/(auth)/login");
+              }
+            } catch (err) {
+              Alert.alert("Error", "Failed to delete account. Please try again.");
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Get Initials
@@ -308,6 +339,18 @@ export default function MyProfileScreen({ navigation }) {
         >
           <Ionicons name="log-out-outline" size={22} color={THEME.danger} />
           <Text style={styles.signOutText}>Sign Out of MediCare</Text>
+        </TouchableOpacity>
+
+        {/* Delete Account Button (CRUD: Delete Profile) */}
+        <TouchableOpacity
+          style={styles.deleteAccountButton}
+          activeOpacity={0.85}
+          onPress={handleDeleteAccount}
+          accessibilityLabel="Delete Account button"
+          accessibilityRole="button"
+        >
+          <Ionicons name="trash-outline" size={20} color={THEME.danger} />
+          <Text style={styles.deleteAccountText}>Delete Account & Medical Profile</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -592,6 +635,23 @@ const styles = StyleSheet.create({
   signOutText: {
     color: THEME.danger,
     fontSize: 16,
+    fontWeight: "700",
+  },
+  deleteAccountButton: {
+    height: 52,
+    backgroundColor: "#FCECEC",
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: "#F5C2C2",
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 12,
+  },
+  deleteAccountText: {
+    color: THEME.danger,
+    fontSize: 15,
     fontWeight: "700",
   },
 });

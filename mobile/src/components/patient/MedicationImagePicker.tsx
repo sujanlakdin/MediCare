@@ -102,7 +102,7 @@ export default function MedicationImagePicker({
   };
 
   const handleRemovePhoto = () => {
-    onChange(undefined);
+    onChange('');
   };
 
   return (

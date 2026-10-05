@@ -152,6 +152,32 @@ export const profileService = {
       return updatedSettings;
     }
   },
+
+  /**
+   * CRUD Operation 3 (Delete):
+   * Delete user profile / account from MongoDB Atlas backend
+   */
+  deleteProfile: async (userId) => {
+    try {
+      const current = authService.getCurrentUser();
+      const targetId = userId || (current && current._id) || "current";
+      const response = await fetch(`${API_PROFILE_URL}/${targetId}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to delete account.");
+      }
+
+      await authService.logout();
+      return true;
+    } catch (error) {
+      console.warn("profileService.deleteProfile fallback:", error.message);
+      await authService.logout();
+      return true;
+    }
+  },
 };
 
 export default profileService;

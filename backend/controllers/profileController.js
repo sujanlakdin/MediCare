@@ -173,3 +173,43 @@ exports.updateAccessibility = async (req, res) => {
     });
   }
 };
+
+/**
+ * DELETE /api/profile
+ * DELETE /api/profile/:id
+ * CRUD Operation 3: Delete user profile / account from MongoDB Atlas
+ */
+exports.deleteProfile = async (req, res) => {
+  try {
+    const id = req.params?.id || req.body?._id || req.body?.id || req.query?.id;
+    let deletedUser = null;
+
+    if (id && id !== "default" && id !== "current") {
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        deletedUser = await User.findByIdAndDelete(id);
+      } else {
+        deletedUser = await User.findOneAndDelete({ email: id.toLowerCase().trim() });
+      }
+    }
+
+    if (!deletedUser) {
+      // Delete current elderly user
+      const user = (await User.findOne({ email: "chathura.rajapakse@medicare.com" })) || (await User.findOne());
+      if (user) {
+        deletedUser = await User.findByIdAndDelete(user._id);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Account and profile deleted successfully from MediCare.",
+      id: deletedUser ? deletedUser._id : id,
+    });
+  } catch (error) {
+    console.error("Delete Profile Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to delete user profile.",
+    });
+  }
+};

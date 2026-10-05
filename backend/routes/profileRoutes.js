@@ -25,4 +25,10 @@ router.put("/", profileController.updateProfile);
 // PUT /api/profile/:id
 router.put("/:id", profileController.updateProfile);
 
+// CRUD 2: Delete user profile / account
+// DELETE /api/profile
+router.delete("/", profileController.deleteProfile);
+// DELETE /api/profile/:id
+router.delete("/:id", profileController.deleteProfile);
+
 module.exports = router;
