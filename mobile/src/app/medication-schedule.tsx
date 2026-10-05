@@ -97,7 +97,7 @@ export default function MedicationScheduleScreen() {
   };
 
   const handleAddMedication = () => {
-    Alert.alert('Add Medication', 'Add a new scheduled dose.');
+    router.push('/reminder-setup');
   };
 
   const renderCard = (item: MedicationScheduleItem) => {
