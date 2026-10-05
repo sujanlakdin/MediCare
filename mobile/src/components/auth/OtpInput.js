@@ -12,12 +12,17 @@ import { COLORS, FONTS } from '../../theme';
  * OtpInput Component
  * 6 auto-advancing digit boxes with paste support, backspace navigation,
  * filled visual feedback, and shake animation on invalid submission.
+ * @param {Object} props
+ * @param {string[]} [props.code]
+ * @param {(digits: string[]) => void} [props.onChangeCode]
+ * @param {boolean} [props.isError]
+ * @param {(code: string) => void} [props.onComplete]
  */
 export default function OtpInput({
   code = ['', '', '', '', '', ''],
-  onChangeCode,
+  onChangeCode = () => {},
   isError = false,
-  onComplete,
+  onComplete = () => {},
 }) {
   const inputRefs = useRef([]);
   const shakeAnim = useRef(new Animated.Value(0)).current;

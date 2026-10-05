@@ -9,6 +9,18 @@ export default function LoginRoute() {
         router.push('/signup' as any);
       } else if (screen === 'Welcome' || screen === '/welcome') {
         router.push('/welcome' as any);
+      } else if (
+        screen === 'ForgotPassword' ||
+        screen === '/forgot-password' ||
+        screen === '/(auth)/forgot-password'
+      ) {
+        router.push('/(auth)/forgot-password' as any);
+      } else if (
+        screen === 'ResetPassword' ||
+        screen === '/reset-password' ||
+        screen === '/(auth)/reset-password'
+      ) {
+        router.push('/(auth)/reset-password' as any);
       } else if (screen.includes('dashboard')) {
         router.replace('/(patient)/dashboard' as any);
       } else {
@@ -18,6 +30,12 @@ export default function LoginRoute() {
     replace: (screen: string) => {
       if (screen === 'SignUp' || screen === '/signup') {
         router.replace('/signup' as any);
+      } else if (
+        screen === 'ForgotPassword' ||
+        screen === '/forgot-password' ||
+        screen === '/(auth)/forgot-password'
+      ) {
+        router.replace('/(auth)/forgot-password' as any);
       } else if (screen.includes('dashboard')) {
         router.replace('/(patient)/dashboard' as any);
       } else {

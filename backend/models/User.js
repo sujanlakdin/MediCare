@@ -103,15 +103,14 @@ const UserSchema = new mongoose.Schema(
 );
 
 // Pre-save hook to hash password if modified
-UserSchema.pre("save", function (next) {
+UserSchema.pre("save", function () {
   if (!this.isModified("password")) {
-    return next();
+    return;
   }
 
   // Generate salt and hash
   this.salt = crypto.randomBytes(16).toString("hex");
   this.password = hashPassword(this.password, this.salt);
-  next();
 });
 
 // Instance method to compare password

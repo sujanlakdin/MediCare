@@ -18,9 +18,9 @@ export default function PrimaryButton({
   loading = false,
   disabled = false,
   variant = 'brand', // 'brand' | 'white' | 'dark'
-  accessibilityLabel,
-  style,
-  textStyle,
+  accessibilityLabel = '',
+  style = null,
+  textStyle = null,
 }) {
   const isBrand = variant === 'brand';
   const isWhite = variant === 'white';

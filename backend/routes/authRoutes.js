@@ -16,6 +16,9 @@ router.post("/login", authController.login);
 // POST /api/auth/forgot-password - Request verification code for password reset
 router.post("/forgot-password", authController.forgotPassword);
 
+// POST /api/auth/verify-otp - Verify 6-digit OTP code
+router.post("/verify-otp", authController.verifyOtp);
+
 // POST /api/auth/reset-password - Verify code and set new password
 router.post("/reset-password", authController.resetPassword);
 

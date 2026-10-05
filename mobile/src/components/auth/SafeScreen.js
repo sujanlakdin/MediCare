@@ -17,11 +17,18 @@ import { COLORS } from '../../theme';
  * Combines SafeAreaView + KeyboardAvoidingView + ScrollView
  * Guarantees that keyboard interactions never obscure input fields.
  * Safely supports multiple children and cross-platform (Web, iOS, Android).
+ * @param {Object} props
+ * @param {any} [props.children]
+ * @param {any} [props.style]
+ * @param {any} [props.contentContainerStyle]
+ * @param {boolean} [props.scrollable]
+ * @param {any} [props.barStyle]
+ * @param {string} [props.backgroundColor]
  */
 export default function SafeScreen({
   children,
-  style,
-  contentContainerStyle,
+  style = undefined,
+  contentContainerStyle = undefined,
   scrollable = true,
   barStyle = 'light-content',
   backgroundColor = COLORS.surface,

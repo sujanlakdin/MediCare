@@ -4,9 +4,10 @@ import { COLORS } from '../../theme';
 
 /**
  * StepIndicator Component
- * Renders 3 horizontal indicator bars for multi-step flows (Forgot -> OTP -> Reset)
- * @param {number} currentStep - 1, 2, or 3
- * @param {number} totalSteps - default 3
+ * Renders horizontal indicator bars for multi-step flows (Forgot -> OTP -> Reset)
+ * @param {Object} props
+ * @param {number} [props.currentStep] - 1, 2, or 3
+ * @param {number} [props.totalSteps] - default 3
  */
 export default function StepIndicator({ currentStep = 1, totalSteps = 3 }) {
   return (

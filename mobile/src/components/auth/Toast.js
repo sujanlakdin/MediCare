@@ -9,9 +9,11 @@ import { COLORS, FONTS } from '../../theme';
 export default function Toast({
   visible = false,
   message = '',
-  onDismiss,
+  onDismiss = () => {},
+  onHide = () => {},
   duration = 2600,
 }) {
+  const handleDismiss = onDismiss || onHide;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const translateYAnim = useRef(new Animated.Value(14)).current;
 
@@ -43,7 +45,7 @@ export default function Toast({
             useNativeDriver: true,
           }),
         ]).start(() => {
-          if (onDismiss) onDismiss();
+          if (handleDismiss) handleDismiss();
         });
       }, duration);
 
