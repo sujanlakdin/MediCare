@@ -37,6 +37,11 @@ mongoose
   })
   .catch((error) => {
     console.error("MongoDB connection error:", error.message);
+    if (error.message && error.message.includes("ECONNREFUSED")) {
+      console.warn("\n[Tip] MongoDB is not running on 127.0.0.1:27017.");
+      console.warn("  1. If installed locally, start the service in an Admin terminal: `net start MongoDB` or run `mongod`");
+      console.warn("  2. If using MongoDB Atlas (cloud), update MONGO_URI in `backend/.env`:\n     MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/medicare?retryWrites=true&w=majority\n");
+    }
   });
 
 app.get("/", (req, res) => {
