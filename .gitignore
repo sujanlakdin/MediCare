@@ -3,6 +3,7 @@ node_modules/
 
 # npm lockfiles
 package-lock.json
+**/package-lock.json
 
 # environment files
 .env

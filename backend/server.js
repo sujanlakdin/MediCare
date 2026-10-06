@@ -1,3 +1,7 @@
+const dns = require("dns");
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
+if (dns.setDefaultResultOrder) dns.setDefaultResultOrder("ipv4first");
+
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
@@ -25,7 +29,8 @@ if (!jwtSecret || jwtSecret.length < 32) {
 }
 
 app.use(cors());
-app.use(express.json({ limit: "32kb" }));
+app.use(express.json({ limit: "32kb" }{ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use("/api/auth", authRoutes);
@@ -59,9 +64,27 @@ mongoose
     }
   });
 
+// API Routes
+const authRoutes = require("./routes/authRoutes");
+const profileRoutes = require("./routes/profileRoutes");
+const medicationRoutes = require("./routes/medicationRoutes");
+
+app.use("/api/auth", authRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/medications", medicationRoutes);
+
+// API Routes
+const authRoutes = require("./routes/authRoutes");
+const profileRoutes = require("./routes/profileRoutes");
+const medicationRoutes = require("./routes/medicationRoutes");
+
+app.use("/api/auth", authRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/medications", medicationRoutes);
+
 app.get("/", (req, res) => {
   res.json({
-    message: "MediCare Backend is running!"
+    message: "MediCare Backend is running!",
   });
 });
 
