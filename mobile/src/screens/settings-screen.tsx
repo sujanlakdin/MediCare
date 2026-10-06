@@ -1,6 +1,7 @@
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
   Modal,
   Pressable,
   StyleSheet,
@@ -9,9 +10,9 @@ import {
 } from 'react-native';
 
 import { CareIcon, type CareIconName } from '@/components/care-icon';
-import { LogoutButton } from '@/components/logout-button';
 import { Screen } from '@/components/screen';
 import { useAccessibility } from '@/contexts/accessibility-context';
+import { useAuth } from '@/contexts/auth-context';
 
 type SettingsItem = {
   id: string;
@@ -21,6 +22,7 @@ type SettingsItem = {
 };
 
 export default function SettingsScreen() {
+  const { signOut } = useAuth();
   const { settings } = useAccessibility();
   const [privacyVisible, setPrivacyVisible] = useState(false);
 
@@ -63,6 +65,19 @@ export default function SettingsScreen() {
     },
   ];
 
+  function handleLogout() {
+    Alert.alert('Log Out', 'Are you sure you want to log out of MediCare?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log Out',
+        style: 'destructive',
+        onPress: () => {
+          void signOut().then(() => router.replace('/(auth)/login' as Href));
+        },
+      },
+    ]);
+  }
+
   return (
     <Screen
       title="Settings"
@@ -96,7 +111,18 @@ export default function SettingsScreen() {
       </View>
 
       {/* Log Out Button */}
-      <LogoutButton largerButtons={settings.largerButtons} />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Log Out"
+        onPress={handleLogout}
+        style={({ pressed }) => [
+          styles.logoutButton,
+          settings.largerButtons && styles.largeLogoutButton,
+          pressed && styles.pressed,
+        ]}>
+        <CareIcon name="logout" size={18} color="#E53935" />
+        <Text style={styles.logoutButtonText}>Log Out</Text>
+      </Pressable>
 
       {/* Privacy Notice Modal */}
       <Modal
@@ -168,6 +194,26 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#EDF2EE',
     marginLeft: 64,
+  },
+  logoutButton: {
+    height: 52,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#FACDCD',
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 6,
+  },
+  largeLogoutButton: {
+    height: 62,
+  },
+  logoutButtonText: {
+    color: '#E53935',
+    fontSize: 16,
+    fontWeight: '700',
   },
   pressed: {
     opacity: 0.75,

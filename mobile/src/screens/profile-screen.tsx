@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CareIcon } from '@/components/care-icon';
-import { LogoutButton } from '@/components/logout-button';
 import { Screen } from '@/components/screen';
 import { useAccessibility } from '@/contexts/accessibility-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -330,8 +329,6 @@ export default function ProfileScreen() {
             <Text style={styles.caregiverTitle}>Caregiver & Emergency</Text>
             <CareIcon name="chevron-right" size={18} color="#71827A" />
           </Pressable>
-
-          <LogoutButton largerButtons={settings.largerButtons} />
         </>
       )}
 
