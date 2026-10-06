@@ -1,2 +1,5 @@
 # Installed dependencies
 node_modules/
+
+# npm dependency lockfiles
+**/package-lock.json

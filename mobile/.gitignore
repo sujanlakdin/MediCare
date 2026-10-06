@@ -3,7 +3,7 @@
 # dependencies
 node_modules/
 
-# npm lockfile
+# npm dependency lockfile (also covered by the repository root .gitignore)
 /package-lock.json
 
 # Expo
