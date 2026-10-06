@@ -1,4 +1,7 @@
 const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const multer = require("multer");
 const User = require("../models/User");
 const {
   readBoolean,
@@ -9,6 +12,50 @@ const {
 } = require("../validation");
 
 const router = express.Router();
+const uploadDirectory = path.join(__dirname, "..", "..", "uploads");
+fs.mkdirSync(uploadDirectory, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, callback) => callback(null, uploadDirectory),
+    filename: (_req, file, callback) => {
+      const extension = path.extname(file.originalname || "").toLowerCase() || ".jpg";
+      const fileName = `profile-${Date.now()}-${Math.round(Math.random() * 1e9)}${extension}`;
+      callback(null, fileName);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => {
+    const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+    const allowedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp"]);
+    const extension = path.extname(file.originalname || "").toLowerCase();
+
+    if (!allowedMimeTypes.has(file.mimetype) || !allowedExtensions.has(extension)) {
+      return callback(new Error("Please select a valid image."));
+    }
+
+    callback(null, true);
+  },
+});
+
+function getUploadFileName(profilePhotoUrl) {
+  if (!profilePhotoUrl) return null;
+  try {
+    const pathname = new URL(profilePhotoUrl).pathname;
+    const fileName = pathname.split("/").filter(Boolean).pop();
+    return fileName || null;
+  } catch {
+    return profilePhotoUrl.split("/").filter(Boolean).pop() || null;
+  }
+}
+
+function removeStoredProfilePhoto(profilePhotoUrl) {
+  const fileName = getUploadFileName(profilePhotoUrl);
+  if (!fileName) return;
+
+  const fullPath = path.join(uploadDirectory, fileName);
+  if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+}
 const notificationKeys = [
   "medicationReminders",
   "reminderSound",
@@ -41,6 +88,58 @@ function pickSettings(input, booleanKeys, extraKeys = []) {
   return settings;
 }
 
+router.put("/profile-photo", upload.single("photo"), async (req, res) => {
+  const file = req.file;
+  if (!file) {
+    const error = new Error("Please select a valid image.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const user = await User.findById(req.userId).select("profilePhotoUrl").lean();
+  if (!user) return res.status(404).json({ error: "Profile not found." });
+
+  const previousPhotoUrl = user.profilePhotoUrl || "";
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  const profilePhotoUrl = `${baseUrl}/uploads/${encodeURIComponent(file.filename)}`;
+
+  const updatedUser = await User.findByIdAndUpdate(
+    req.userId,
+    { $set: { profilePhotoUrl } },
+    { new: true, runValidators: true }
+  ).select("-passwordHash").lean();
+
+  if (!updatedUser) return res.status(404).json({ error: "Profile not found." });
+  if (previousPhotoUrl && previousPhotoUrl !== profilePhotoUrl) removeStoredProfilePhoto(previousPhotoUrl);
+
+  res.json({
+    success: true,
+    message: "Profile photo updated successfully",
+    profilePhoto: updatedUser.profilePhotoUrl || "",
+  });
+});
+
+router.delete("/profile-photo", async (req, res) => {
+  const user = await User.findById(req.userId).select("profilePhotoUrl").lean();
+  if (!user) return res.status(404).json({ error: "Profile not found." });
+
+  const previousPhotoUrl = user.profilePhotoUrl || "";
+  const updatedUser = await User.findByIdAndUpdate(
+    req.userId,
+    { $set: { profilePhotoUrl: "" } },
+    { new: true, runValidators: true }
+  ).select("-passwordHash").lean();
+
+  if (!updatedUser) return res.status(404).json({ error: "Profile not found." });
+  if (previousPhotoUrl) removeStoredProfilePhoto(previousPhotoUrl);
+
+  res.json({
+    success: true,
+    message: "Profile photo removed successfully",
+    profilePhoto: "",
+  });
+});
+
 router.get("/profile", async (req, res) => {
   const user = await User.findById(req.userId).select("-passwordHash").lean();
   if (!user) return res.status(404).json({ error: "Profile not found." });
@@ -63,6 +162,9 @@ router.put("/profile", async (req, res) => {
   }
   if (Object.prototype.hasOwnProperty.call(body, "address")) {
     updates.address = readString(body.address, "Address", { required: false, maxLength: 300 });
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "profilePhotoUrl")) {
+    updates.profilePhotoUrl = readString(body.profilePhotoUrl, "Profile photo URL", { required: false, maxLength: 2048 });
   }
   if (!Object.keys(updates).length) {
     const error = new Error("Provide at least one profile field to update.");

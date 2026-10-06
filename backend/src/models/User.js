@@ -41,6 +41,7 @@ const userSchema = new mongoose.Schema(
     dateOfBirth: { type: String, default: "" },
     gender: { type: String, default: "", trim: true, maxlength: 60 },
     address: { type: String, default: "", trim: true, maxlength: 300 },
+    profilePhotoUrl: { type: String, default: "", trim: true },
     notificationSettings: { type: notificationSettingsSchema, default: () => ({}) },
     accessibilitySettings: { type: accessibilitySettingsSchema, default: () => ({}) },
     emergencyContact: { type: emergencyContactSchema, default: () => ({}) },

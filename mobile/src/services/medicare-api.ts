@@ -15,6 +15,7 @@ export type Profile = {
   dateOfBirth: string;
   gender: string;
   address: string;
+  profilePhotoUrl?: string;
   emergencyContact: EmergencyContact;
 };
 
@@ -47,6 +48,29 @@ export function getProfile(token: string) {
 export function updateProfile(token: string, changes: ProfileChanges) {
   return apiRequest<{ profile: Profile }>('/api/users/profile', {
     method: 'PUT', token, body: changes,
+  });
+}
+
+export function uploadProfilePhoto(token: string, uri: string, fileName?: string) {
+  const safeFileName = fileName || uri.split('/').pop() || 'profile-photo.jpg';
+  const extension = safeFileName.split('.').pop()?.toLowerCase() || 'jpg';
+  const mimeType = extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : 'image/jpeg';
+  const formData = new FormData();
+
+  formData.append('photo', {
+    uri,
+    name: safeFileName,
+    type: mimeType,
+  } as unknown as Blob);
+
+  return apiRequest<{ success: boolean; message: string; profilePhoto: string }>('/api/users/profile-photo', {
+    method: 'PUT', token, body: formData, isFormData: true,
+  });
+}
+
+export function removeProfilePhoto(token: string) {
+  return apiRequest<{ success: boolean; message: string; profilePhoto: string }>('/api/users/profile-photo', {
+    method: 'DELETE', token,
   });
 }
 

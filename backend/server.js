@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const dns = require("dns");
+const path = require("path");
 require("dotenv").config();
 
 // Ensure reliable DNS SRV resolution for MongoDB Atlas on Windows networks
@@ -25,6 +26,7 @@ if (!jwtSecret || jwtSecret.length < 32) {
 
 app.use(cors());
 app.use(express.json({ limit: "32kb" }));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", authenticate, userRoutes);
@@ -33,7 +35,12 @@ app.use("/api/support", authenticate, supportRoutes);
 
 app.use((error, _req, res, _next) => {
   const status = error.statusCode || 500;
-  const message = status >= 500 ? "An unexpected server error occurred." : error.message;
+  let message = error.message || "An unexpected server error occurred.";
+
+  if (error.code === "LIMIT_FILE_SIZE") message = "Please select a smaller image.";
+  if (error.code === "LIMIT_UNEXPECTED_FILE") message = "Please select a valid image.";
+  if (status >= 500) message = "An unexpected server error occurred.";
+
   if (status >= 500) console.error(error);
   res.status(status).json({ error: message });
 });

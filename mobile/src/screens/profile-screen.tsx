@@ -1,13 +1,15 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
+import { launchCameraAsync, launchImageLibraryAsync, requestCameraPermissionsAsync, requestMediaLibraryPermissionsAsync, type ImagePickerAsset } from 'expo-image-picker';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CareIcon } from '@/components/care-icon';
 import { Screen } from '@/components/screen';
 import { useAccessibility } from '@/contexts/accessibility-context';
 import { useAuth } from '@/contexts/auth-context';
 import { ApiError } from '@/services/api';
-import { getProfile, type Profile } from '@/services/medicare-api';
+import { getProfile, removeProfilePhoto, type Profile, uploadProfilePhoto } from '@/services/medicare-api';
 
 const DEFAULT_PROFILE = {
   fullName: 'Chathura Rajapakse',
@@ -24,6 +26,13 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [photoMenuVisible, setPhotoMenuVisible] = useState(false);
+  const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{ uri: string; name?: string } | null>(null);
+  const [previewMode, setPreviewMode] = useState<'camera' | 'gallery' | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState(false);
+  const [photoVersion, setPhotoVersion] = useState(Date.now());
 
   const loadProfile = useCallback(async () => {
     if (!token) {
@@ -35,6 +44,8 @@ export default function ProfileScreen() {
     try {
       const result = await getProfile(token);
       setProfile(result.profile);
+      setImageLoadError(false);
+      setPhotoVersion(Date.now());
     } catch (requestError) {
       setError(
         requestError instanceof ApiError
@@ -50,11 +61,129 @@ export default function ProfileScreen() {
     void loadProfile();
   }, [loadProfile]);
 
+  const handlePhotoSelection = async (mode: 'camera' | 'gallery') => {
+    if (!token) {
+      Alert.alert('Profile Photo', 'Please sign in to update your profile photo.');
+      return;
+    }
+
+    setPhotoMenuVisible(false);
+
+    try {
+      const permissions = mode === 'camera'
+        ? await requestCameraPermissionsAsync()
+        : await requestMediaLibraryPermissionsAsync();
+
+      if (permissions.status !== 'granted') {
+        Alert.alert(
+          'Profile Photo',
+          mode === 'camera'
+            ? 'Camera permission is required to take a profile photo.'
+            : 'Photo library permission is required to choose a profile photo.'
+        );
+        return;
+      }
+
+      const result = mode === 'camera'
+        ? await launchCameraAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.85,
+            mediaTypes: ['images'],
+          })
+        : await launchImageLibraryAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.85,
+            mediaTypes: ['images'],
+          });
+
+      if (result.canceled || !result.assets?.length) {
+        Alert.alert('Profile Photo', mode === 'camera' ? 'Photo capture was cancelled.' : 'Photo selection was cancelled.');
+        return;
+      }
+
+      const asset = result.assets[0];
+      const fileSize = asset.fileSize ?? 0;
+      const mimeType = asset.mimeType || 'image/jpeg';
+      const fileName = asset.fileName || `profile-photo-${Date.now()}.jpg`;
+      const validMimeType = ['image/jpeg', 'image/png', 'image/webp'].includes(mimeType);
+      const validExtension = /\.(jpe?g|png|webp)$/i.test(fileName);
+
+      if (fileSize > 5 * 1024 * 1024) {
+        Alert.alert('Profile Photo', 'Please select a smaller image.');
+        return;
+      }
+
+      if (!validMimeType && !validExtension) {
+        Alert.alert('Profile Photo', 'Please select a valid image.');
+        return;
+      }
+
+      setPreviewImage({ uri: asset.uri, name: fileName });
+      setPreviewMode(mode);
+    } catch {
+      Alert.alert('Profile Photo', 'Unable to access the device camera or photo library.');
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!token || !previewImage) return;
+    setIsUploading(true);
+
+    try {
+      const response = await uploadProfilePhoto(token, previewImage.uri, previewImage.name);
+      setProfile((current) => (current ? { ...current, profilePhotoUrl: response.profilePhoto } : current));
+      setImageLoadError(false);
+      setPhotoVersion(Date.now());
+      setPreviewMode(null);
+      setPreviewImage(null);
+      Alert.alert('Profile Photo', response.message || 'Profile photo updated successfully.');
+    } catch (requestError) {
+      Alert.alert(
+        'Profile Photo',
+        requestError instanceof ApiError ? requestError.message : 'Unable to upload your profile photo. Please try again.'
+      );
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    if (!token) {
+      Alert.alert('Profile Photo', 'Please sign in to remove your profile photo.');
+      return;
+    }
+
+    Alert.alert('Remove Profile Photo?', 'Are you sure you want to remove your profile photo?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const response = await removeProfilePhoto(token);
+            setProfile((current) => (current ? { ...current, profilePhotoUrl: '' } : current));
+            setImageLoadError(false);
+            setPhotoVersion(Date.now());
+            Alert.alert('Profile Photo', response.message || 'Profile photo removed successfully.');
+          } catch (requestError) {
+            Alert.alert(
+              'Profile Photo',
+              requestError instanceof ApiError ? requestError.message : 'Unable to remove your profile photo. Please try again.'
+            );
+          }
+        },
+      },
+    ]);
+  };
+
   // Derive display values from profile or fallback to the reference mockup
   const displayName = profile?.fullName?.trim() || DEFAULT_PROFILE.fullName;
   const displayEmail = profile?.email?.trim() || DEFAULT_PROFILE.email;
   const displayPhone = profile?.phone?.trim() || DEFAULT_PROFILE.phone;
   const displayAddress = profile?.address?.trim() || DEFAULT_PROFILE.address;
+  const hasProfilePhoto = Boolean(profile?.profilePhotoUrl && profile.profilePhotoUrl.trim());
 
   // Compute age from dateOfBirth if available, otherwise default to 72 Years Old
   let displayAge = DEFAULT_PROFILE.age;
@@ -68,6 +197,10 @@ export default function ProfileScreen() {
   const displayMedicalId = profile?._id
     ? `MRX-${profile._id.slice(-4).toUpperCase()}-72`
     : DEFAULT_PROFILE.medicalId;
+
+  const avatarSource = profile?.profilePhotoUrl && !imageLoadError
+    ? { uri: `${profile.profilePhotoUrl}${profile.profilePhotoUrl.includes('?') ? '&' : '?'}v=${photoVersion}` }
+    : require('@/assets/images/chathura_avatar.jpg');
 
   return (
     <Screen
@@ -85,11 +218,21 @@ export default function ProfileScreen() {
           <View style={styles.identityBlock}>
             <View style={styles.avatarWrapper}>
               <Image
-                source={require('@/assets/images/chathura_avatar.jpg')}
+                source={avatarSource}
                 style={styles.avatarImage}
                 accessibilityLabel={`Profile image for ${displayName}`}
+                onError={() => setImageLoadError(true)}
+                onLoad={() => setImageLoadError(false)}
               />
             </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Change profile photo"
+              accessibilityHint="Take a new photo, choose one from the gallery, view or remove your profile photo"
+              onPress={() => setPhotoMenuVisible(true)}
+              style={styles.cameraButton}>
+              <Ionicons name="camera" size={18} color="#FFFFFF" />
+            </Pressable>
             <Text
               style={[
                 styles.nameText,
@@ -188,6 +331,76 @@ export default function ProfileScreen() {
           </Pressable>
         </>
       )}
+
+      <Modal transparent visible={photoMenuVisible} animationType="fade" onRequestClose={() => setPhotoMenuVisible(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setPhotoMenuVisible(false)}>
+          <Pressable style={styles.modalCard} onPress={() => undefined}>
+            <Text style={styles.modalTitle}>Profile Photo</Text>
+            <Pressable style={styles.optionButton} onPress={() => void handlePhotoSelection('camera')}>
+              <Text style={styles.optionText}>Take Photo</Text>
+            </Pressable>
+            <Pressable style={styles.optionButton} onPress={() => void handlePhotoSelection('gallery')}>
+              <Text style={styles.optionText}>Choose From Gallery</Text>
+            </Pressable>
+            {hasProfilePhoto && (
+              <>
+                <Pressable style={styles.optionButton} onPress={() => { setPhotoMenuVisible(false); setPhotoViewerVisible(true); }}>
+                  <Text style={styles.optionText}>View Photo</Text>
+                </Pressable>
+                <Pressable style={styles.optionButton} onPress={() => { setPhotoMenuVisible(false); void handleRemovePhoto(); }}>
+                  <Text style={[styles.optionText, styles.destructiveText]}>Remove Photo</Text>
+                </Pressable>
+              </>
+            )}
+            <Pressable style={[styles.optionButton, styles.cancelButton]} onPress={() => setPhotoMenuVisible(false)}>
+              <Text style={styles.cancelText}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal transparent visible={!!previewImage} animationType="slide" onRequestClose={() => setPreviewImage(null)}>
+        <View style={styles.previewOverlay}>
+          <View style={styles.previewCard}>
+            <Text style={styles.previewTitle}>Confirm Profile Photo</Text>
+            <Image source={{ uri: previewImage?.uri || '' }} style={styles.previewImage} />
+            <View style={styles.previewActions}>
+              <Pressable style={[styles.previewAction, styles.secondaryAction]} onPress={() => { setPreviewImage(null); setPreviewMode(null); }}>
+                <Text style={styles.secondaryActionText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={[styles.previewAction, styles.secondaryAction]} onPress={() => { setPreviewImage(null); setPreviewMode(null); setPhotoMenuVisible(true); }}>
+                <Text style={styles.secondaryActionText}>{previewMode === 'camera' ? 'Retake' : 'Choose Another'}</Text>
+              </Pressable>
+              <Pressable style={[styles.previewAction, styles.primaryAction]} onPress={() => void handleUpload()} disabled={isUploading}>
+                <Text style={styles.primaryActionText}>{isUploading ? 'Uploading...' : 'Use Photo'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal transparent visible={photoViewerVisible} animationType="fade" onRequestClose={() => setPhotoViewerVisible(false)}>
+        <View style={styles.viewerOverlay}>
+          <View style={styles.viewerCard}>
+            <View style={styles.viewerHeader}>
+              <Text style={styles.viewerTitle}>Profile Photo</Text>
+              <Pressable onPress={() => setPhotoViewerVisible(false)} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>Close</Text>
+              </Pressable>
+            </View>
+            {profile?.profilePhotoUrl ? (
+              <Image
+                source={{ uri: `${profile.profilePhotoUrl}${profile.profilePhotoUrl.includes('?') ? '&' : '?'}v=${photoVersion}` }}
+                style={styles.viewerImage}
+                resizeMode="contain"
+                onError={() => setImageLoadError(true)}
+              />
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </Screen>
   );
 }
@@ -203,6 +416,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   identityBlock: {
+    position: 'relative',
     alignItems: 'center',
     paddingVertical: 8,
     gap: 8,
@@ -348,5 +562,167 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.8,
+  },
+  cameraButton: {
+    position: 'absolute',
+    right: 124,
+    top: 56,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#0E3E2F',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(12, 35, 29, 0.35)',
+    justifyContent: 'flex-end',
+    padding: 16,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 12,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#E4EEE8',
+  },
+  modalTitle: {
+    color: '#0E3E2F',
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  optionButton: {
+    minHeight: 48,
+    borderRadius: 12,
+    backgroundColor: '#F3F9F5',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  optionText: {
+    color: '#0E3E2F',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  destructiveText: {
+    color: '#D14C4C',
+  },
+  cancelButton: {
+    backgroundColor: '#EEF4F1',
+  },
+  cancelText: {
+    color: '#0E3E2F',
+    textAlign: 'center',
+    fontWeight: '700',
+  },
+  previewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(12, 35, 29, 0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  previewCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: '#E4EEE8',
+  },
+  previewTitle: {
+    color: '#0E3E2F',
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  previewImage: {
+    width: '100%',
+    height: 300,
+    borderRadius: 14,
+    backgroundColor: '#EDF5EE',
+  },
+  previewActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  previewAction: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryAction: {
+    backgroundColor: '#EEF4F1',
+  },
+  secondaryActionText: {
+    color: '#0E3E2F',
+    fontWeight: '700',
+  },
+  primaryAction: {
+    backgroundColor: '#0E3E2F',
+  },
+  primaryActionText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  viewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(12, 35, 29, 0.6)',
+    justifyContent: 'center',
+    padding: 18,
+  },
+  viewerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E4EEE8',
+  },
+  viewerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEF2EE',
+  },
+  viewerTitle: {
+    color: '#0E3E2F',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  closeButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  closeButtonText: {
+    color: '#0E3E2F',
+    fontWeight: '700',
+  },
+  viewerImage: {
+    width: '100%',
+    height: 380,
+    backgroundColor: '#EDF5EE',
+  },
+  errorText: {
+    color: '#B94B4B',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 10,
+    textAlign: 'center',
   },
 });
