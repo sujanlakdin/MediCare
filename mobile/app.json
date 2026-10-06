@@ -32,6 +32,13 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "MediCare needs access to your photos to attach a medicine picture.",
+          "cameraPermission": "MediCare needs the camera to take a photo of your medicine."
+        }
       ]
     ],
     "experiments": {
