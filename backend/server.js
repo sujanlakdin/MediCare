@@ -9,12 +9,20 @@ require("dotenv").config();
 
 const app = express();
 
+const authRoutes = require("./routes/authRoutes");
+const patientRoutes = require("./routes/patientRoutes");
+const medicationRoutes = require("./routes/medicationRoutes");
+
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
+const mongoURI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/medicare";
+
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(mongoURI, {
+    serverSelectionTimeoutMS: 5000,
+  })
   .then(() => {
     console.log("MongoDB connected successfully!");
   })
