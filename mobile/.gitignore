@@ -3,7 +3,12 @@
 # dependencies
 node_modules/
 
-# npm dependency lockfile (also covered by the repository root .gitignore)
+# dependencies
+node_modules/
+
+# npm lockfiles
+package-lock.json
+# also covered by the repository root .gitignore
 /package-lock.json
 
 # Expo
@@ -34,6 +39,9 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
+.env.*
+!.env.example
 .env*.local
 
 # typescript

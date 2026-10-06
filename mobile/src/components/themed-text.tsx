@@ -1,6 +1,7 @@
 import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
 
 import { Fonts, ThemeColor } from '@/constants/theme';
+import { useAccessibility } from '@/contexts/accessibility-context';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ThemedTextProps = TextProps & {
@@ -10,6 +11,13 @@ export type ThemedTextProps = TextProps & {
 
 export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
   const theme = useTheme();
+  const { settings } = useAccessibility();
+  const fontScale = settings.fontSize === 'extraLarge' ? 1.35 : settings.fontSize === 'large' ? 1.18 : 1;
+  const explicitStyle = StyleSheet.flatten(style);
+  const baseFontSize = typeof explicitStyle?.fontSize === 'number' ? explicitStyle.fontSize : styles[type].fontSize;
+  const baseLineHeight = typeof explicitStyle?.lineHeight === 'number'
+    ? explicitStyle.lineHeight
+    : styles[type].lineHeight ?? Math.round(baseFontSize * 1.5);
 
   return (
     <Text
@@ -24,6 +32,7 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
         type === 'linkPrimary' && styles.linkPrimary,
         type === 'code' && styles.code,
         style,
+        { fontSize: baseFontSize * fontScale, lineHeight: baseLineHeight * fontScale },
       ]}
       {...rest}
     />
@@ -69,5 +78,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.mono,
     fontWeight: Platform.select({ android: 700 }) ?? 500,
     fontSize: 12,
+    lineHeight: 18,
   },
 });

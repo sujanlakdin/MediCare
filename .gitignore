@@ -1,5 +1,31 @@
-# Installed dependencies
+# dependencies
 node_modules/
 
-# npm dependency lockfiles
+# npm lockfiles
+package-lock.json
 **/package-lock.json
+
+# environment files
+.env
+.env.*
+!.env.example
+.env*.local
+
+# logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# build outputs
+dist/
+build/
+
+# Editor
+.vscode/
+.idea/
+*.orig.*
