@@ -1,6 +1,6 @@
 const Patient = require('../models/Patient');
 
-// Sample default patients if database is empty
+// Sample default patients if database is empty\.
 const defaultPatients = [
   {
     _id: '650000000000000000000001',
