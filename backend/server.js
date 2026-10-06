@@ -1,7 +1,3 @@
-const dns = require("dns");
-dns.setServers(["8.8.8.8", "1.1.1.1"]);
-if (dns.setDefaultResultOrder) dns.setDefaultResultOrder("ipv4first");
-
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
@@ -12,6 +8,7 @@ require("dotenv").config();
 // Ensure reliable DNS SRV resolution for MongoDB Atlas on Windows networks
 try {
   dns.setServers(["8.8.8.8", "1.1.1.1"]);
+  if (dns.setDefaultResultOrder) dns.setDefaultResultOrder("ipv4first");
 } catch {
   // Use default system resolvers if unavailable
 }
@@ -65,11 +62,11 @@ mongoose
   });
 
 // API Routes
-const authRoutes = require("./routes/authRoutes");
+const legacyAuthRoutes = require("./routes/authRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const medicationRoutes = require("./routes/medicationRoutes");
 
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", legacyAuthRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/medications", medicationRoutes);
 

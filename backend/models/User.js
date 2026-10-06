@@ -130,4 +130,5 @@ UserSchema.methods.toSafeObject = function () {
   return user;
 };
 
-module.exports = mongoose.model("User", UserSchema);
+module.exports =
+  mongoose.models.LegacyUser || mongoose.model("LegacyUser", UserSchema, "users");
