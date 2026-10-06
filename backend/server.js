@@ -73,15 +73,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/medications", medicationRoutes);
 
-// API Routes
-const authRoutes = require("./routes/authRoutes");
-const profileRoutes = require("./routes/profileRoutes");
-const medicationRoutes = require("./routes/medicationRoutes");
-
-app.use("/api/auth", authRoutes);
-app.use("/api/profile", profileRoutes);
-app.use("/api/medications", medicationRoutes);
-
 app.get("/", (req, res) => {
   res.json({
     message: "MediCare Backend is running!",
