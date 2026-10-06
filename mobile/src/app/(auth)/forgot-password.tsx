@@ -8,7 +8,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,11 +21,10 @@ import authService from '../../services/authService';
 
 /**
  * ForgotPasswordScreen (Step 1 of 2)
- * Mobile frontend screen allowing the user to enter their Phone Number and request a 6-digit OTP.
+ * Mobile frontend screen allowing the user to enter their Email Address and request a 6-digit OTP.
  */
 export default function ForgotPasswordRoute() {
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [countryCode, setCountryCode] = useState('+94');
+  const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -38,67 +36,53 @@ export default function ForgotPasswordRoute() {
     setToastVisible(true);
   };
 
-  const handlePhoneChange = (text: string) => {
-    // Keep numbers and spaces/plus
-    setPhoneNumber(text);
+  const handleEmailChange = (text: string) => {
+    setEmail(text);
     if (error) setError('');
   };
 
-  const fillDemoPhone = () => {
-    setCountryCode('+94');
-    setPhoneNumber('77 123 4567');
+  const fillDemoEmail = () => {
+    setEmail('chathura.rajapakse@medicare.com');
     setError('');
   };
 
   const handleRequestOtp = async () => {
-    const rawNumber = phoneNumber.trim();
-    if (!rawNumber) {
-      setError('Please enter your registered phone number');
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      setError('Please enter your registered email address');
       return;
     }
 
-    // Clean digits
-    const digitsOnly = rawNumber.replace(/\D/g, '');
-    if (digitsOnly.length < 7) {
-      setError('Please enter a valid phone number (at least 7-9 digits)');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!emailRegex.test(cleanEmail)) {
+      setError('Please enter a valid email address (e.g. name@example.com)');
       return;
-    }
-
-    // Format full phone
-    let fullPhone = rawNumber;
-    if (!fullPhone.startsWith('+')) {
-      if (fullPhone.startsWith('0')) {
-        // e.g. 077 123 4567 -> +94 77 123 4567
-        fullPhone = countryCode + ' ' + fullPhone.slice(1);
-      } else {
-        fullPhone = countryCode + ' ' + fullPhone;
-      }
     }
 
     setLoading(true);
     setError('');
     try {
-      const response = await authService.sendResetCode(fullPhone);
+      const response = await authService.forgotPassword(cleanEmail);
 
       const otp = response.otp || response.demoCode;
       if (otp) {
         setDevOtpNotice(`Dev OTP: ${otp}`);
       }
 
-      showToast(response.message || 'OTP verification code sent!');
+      showToast(response.message || 'OTP verification code sent to your email!');
 
-      // Navigate to Reset Password screen with phone parameter
+      // Navigate to Reset Password screen with email parameter
       setTimeout(() => {
         router.push({
           pathname: '/(auth)/reset-password',
           params: {
-            phone: fullPhone,
+            email: cleanEmail,
             devOtp: otp || '',
           },
         } as any);
       }, 700);
     } catch (err: any) {
-      const errMsg = err?.message || 'Failed to send OTP. Please check your phone number.';
+      const errMsg = err?.message || 'Failed to send OTP. Please check your email address.';
       setError(errMsg);
       showToast(errMsg);
     } finally {
@@ -134,7 +118,7 @@ export default function ForgotPasswordRoute() {
             <View style={styles.stepContainer}>
               <StepIndicator currentStep={1} totalSteps={2} />
               <Text style={styles.stepLabel} allowFontScaling={true}>
-                Step 1 of 2: Phone Verification
+                Step 1 of 2: Email Verification
               </Text>
             </View>
 
@@ -144,60 +128,60 @@ export default function ForgotPasswordRoute() {
                 Forgot Password?
               </Text>
               <Text style={styles.subheading} allowFontScaling={true}>
-                Enter your registered phone number. We will send you a 6-digit OTP code to safely reset your password.
+                Enter your registered email address. We will send you a 6-digit OTP verification code to safely reset your password.
               </Text>
             </View>
 
             {/* Quick Demo Fill Helper */}
             <TouchableOpacity
               style={styles.demoChip}
-              onPress={fillDemoPhone}
+              onPress={fillDemoEmail}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel="Fill demo phone number"
+              accessibilityLabel="Fill demo email address"
             >
               <Ionicons name="sparkles" size={15} color={COLORS.brand} style={{ marginRight: 6 }} />
               <Text style={styles.demoChipText} allowFontScaling={true}>
-                Use Demo Phone: +94 77 123 4567
+                Use Demo Email: chathura.rajapakse@medicare.com
               </Text>
             </TouchableOpacity>
 
-            {/* Phone Number Input Row */}
+            {/* Email Address Input */}
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel} allowFontScaling={true}>
-                Phone Number
+                Email Address
               </Text>
-              <View style={[styles.phoneRow, Boolean(error) && styles.phoneRowError]}>
-                {/* Country Code Pill */}
-                <View style={styles.countryCodeBadge}>
-                  <Text style={styles.flagIcon}>🇱🇰</Text>
-                  <Text style={styles.countryCodeText} allowFontScaling={true}>
-                    {countryCode}
-                  </Text>
-                </View>
+              <View style={[styles.inputRow, Boolean(error) && styles.inputRowError]}>
+                <Ionicons
+                  name="mail-outline"
+                  size={20}
+                  color={Boolean(error) ? COLORS.danger : COLORS.brand}
+                  style={styles.leadingIcon}
+                />
 
-                {/* Number Input */}
                 <TextInput
-                  style={styles.phoneInput}
-                  placeholder="77 123 4567"
+                  style={styles.textInput}
+                  placeholder="e.g. name@example.com"
                   placeholderTextColor={COLORS.placeholder}
-                  keyboardType="phone-pad"
-                  autoComplete="tel"
-                  value={phoneNumber}
-                  onChangeText={handlePhoneChange}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  value={email}
+                  onChangeText={handleEmailChange}
                   returnKeyType="done"
                   onSubmitEditing={handleRequestOtp}
-                  accessibilityLabel="Phone number input"
-                  accessibilityHint="Enter your mobile phone number to receive an OTP"
+                  accessibilityLabel="Email Address input"
+                  accessibilityHint="Enter your registered email address to receive an OTP code"
                   allowFontScaling={true}
                 />
 
-                {phoneNumber.length > 0 && (
+                {email.length > 0 && (
                   <TouchableOpacity
-                    onPress={() => setPhoneNumber('')}
+                    onPress={() => setEmail('')}
                     style={styles.clearBtn}
                     accessibilityRole="button"
-                    accessibilityLabel="Clear phone number"
+                    accessibilityLabel="Clear email input"
                   >
                     <Ionicons name="close-circle" size={18} color={COLORS.muted} />
                   </TouchableOpacity>
@@ -231,7 +215,7 @@ export default function ForgotPasswordRoute() {
                 title="Send Verification Code"
                 onPress={handleRequestOtp}
                 loading={loading}
-                accessibilityLabel="Send OTP verification code to phone number"
+                accessibilityLabel="Send OTP verification code to email address"
               />
             </View>
 
@@ -239,7 +223,7 @@ export default function ForgotPasswordRoute() {
             <View style={styles.securityBox}>
               <Ionicons name="shield-checkmark-outline" size={18} color={COLORS.brand} style={{ marginRight: 8 }} />
               <Text style={styles.securityText} allowFontScaling={true}>
-                Your data is protected. MediCare will never ask for your password over phone or SMS.
+                Your data is protected. MediCare will never ask for your password over email or phone.
               </Text>
             </View>
 
@@ -346,7 +330,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginLeft: 4,
   },
-  phoneRow: {
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     height: METRICS.inputHeight,
@@ -354,31 +338,16 @@ const styles = StyleSheet.create({
     borderRadius: METRICS.inputRadius,
     borderWidth: 1.5,
     borderColor: COLORS.border,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
   },
-  phoneRowError: {
+  inputRowError: {
     borderColor: COLORS.danger,
     backgroundColor: '#FFF8F8',
   },
-  countryCodeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingRight: 10,
-    borderRightWidth: 1,
-    borderRightColor: COLORS.border,
+  leadingIcon: {
     marginRight: 12,
   },
-  flagIcon: {
-    fontSize: 18,
-    marginRight: 4,
-  },
-  countryCodeText: {
-    fontSize: FONTS.sizes.md,
-    fontWeight: FONTS.weights.semibold as any,
-    color: COLORS.text,
-    fontFamily: FONTS.family,
-  },
-  phoneInput: {
+  textInput: {
     flex: 1,
     height: '100%',
     fontSize: FONTS.sizes.md,

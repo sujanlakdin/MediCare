@@ -8,7 +8,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Animated,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,12 +23,16 @@ import authService from '../../services/authService';
 
 /**
  * ResetPasswordScreen (Step 2 of 2)
- * Mobile frontend screen to input the 6-digit OTP and set a new password.
+ * Mobile frontend screen to input Email, 6-digit OTP, and new password.
  */
 export default function ResetPasswordRoute() {
-  const params = useLocalSearchParams<{ phone?: string; devOtp?: string }>();
-  const phone = (params.phone as string) || '+94 77 123 4567';
+  const params = useLocalSearchParams<{ email?: string; phone?: string; devOtp?: string }>();
+  const initialEmail = (params.email as string) || (params.phone as string) || '';
   const initialDevOtp = (params.devOtp as string) || '';
+
+  // Email state (from route params or input)
+  const [email, setEmail] = useState(initialEmail);
+  const [emailError, setEmailError] = useState('');
 
   // OTP digits state (6 digits)
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
@@ -106,9 +109,16 @@ export default function ResetPasswordRoute() {
   };
 
   const handleResendOtp = async () => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      setEmailError('Please enter your email to resend code');
+      showToast('Please enter your email address.');
+      return;
+    }
     if (countdown > 0) return;
+
     try {
-      const response = await authService.sendResetCode(phone);
+      const response = await authService.forgotPassword(cleanEmail);
       startCountdown();
       showToast(response.message || 'A new 6-digit code has been sent!');
       if (response.otp) {
@@ -121,6 +131,19 @@ export default function ResetPasswordRoute() {
 
   const validate = (): boolean => {
     let valid = true;
+
+    // Check Email
+    const cleanEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!cleanEmail) {
+      setEmailError('Please enter your email address');
+      valid = false;
+    } else if (!emailRegex.test(cleanEmail)) {
+      setEmailError('Please enter a valid email address');
+      valid = false;
+    } else {
+      setEmailError('');
+    }
 
     // Check OTP
     const otpCode = digits.join('').trim();
@@ -161,17 +184,26 @@ export default function ResetPasswordRoute() {
   const handleResetPassword = async () => {
     if (!validate()) return;
 
+    const cleanEmail = email.trim().toLowerCase();
     const otpCode = digits.join('').trim();
+
     setLoading(true);
     try {
-      const result = await authService.resetPassword(phone, newPassword, otpCode);
+      const result = await authService.resetPassword(cleanEmail, otpCode, newPassword);
       setIsSuccess(true);
       showToast(result.message || 'Password successfully updated!');
+
+      // On success, display a success toast and navigate to login
+      setTimeout(() => {
+        router.replace('/(auth)/login' as any);
+      }, 1200);
     } catch (err: any) {
       const msg = err?.message || 'Failed to reset password. Please verify the code.';
       if (msg.toLowerCase().includes('code') || msg.toLowerCase().includes('otp')) {
         setOtpError(msg);
         setIsOtpError(true);
+      } else if (msg.toLowerCase().includes('email')) {
+        setEmailError(msg);
       } else {
         setPasswordError(msg);
       }
@@ -184,41 +216,6 @@ export default function ResetPasswordRoute() {
   const handleBackToLogin = () => {
     router.replace('/(auth)/login' as any);
   };
-
-  const handleEditPhone = () => {
-    router.back();
-  };
-
-  // Render Success Confirmation View
-  if (isSuccess) {
-    return (
-      <SafeScreen backgroundColor={COLORS.brand} barStyle="light-content">
-        <View style={styles.successContainer}>
-          <View style={styles.successCard}>
-            <View style={styles.successIconCircle}>
-              <Ionicons name="checkmark-sharp" size={44} color={COLORS.surface} />
-            </View>
-
-            <Text style={styles.successTitle} allowFontScaling={true}>
-              Password Updated!
-            </Text>
-
-            <Text style={styles.successMessage} allowFontScaling={true}>
-              Your MediCare account password has been safely updated. You can now log in using your new credentials.
-            </Text>
-
-            <View style={styles.successButtonWrapper}>
-              <PrimaryButton
-                title="Back to Login"
-                onPress={handleBackToLogin}
-                accessibilityLabel="Go to Login screen"
-              />
-            </View>
-          </View>
-        </View>
-      </SafeScreen>
-    );
-  }
 
   return (
     <SafeScreen backgroundColor={COLORS.brand} barStyle="light-content">
@@ -248,24 +245,65 @@ export default function ResetPasswordRoute() {
               </Text>
             </View>
 
-            {/* Target Phone Badge */}
-            <View style={styles.phoneBadgeContainer}>
-              <View style={styles.phoneBadge}>
-                <Ionicons name="phone-portrait-outline" size={16} color={COLORS.brandDark} style={{ marginRight: 6 }} />
-                <Text style={styles.phoneBadgeText} allowFontScaling={true}>
-                  Code sent to <Text style={styles.phoneBadgeBold}>{phone}</Text>
-                </Text>
+            {/* Target Email Badge (if passed from Step 1) */}
+            {initialEmail ? (
+              <View style={styles.emailBadgeContainer}>
+                <View style={styles.emailBadge}>
+                  <Ionicons name="mail-outline" size={16} color={COLORS.brandDark} style={{ marginRight: 6 }} />
+                  <Text style={styles.emailBadgeText} allowFontScaling={true} numberOfLines={1}>
+                    Code sent to <Text style={styles.emailBadgeBold}>{initialEmail}</Text>
+                  </Text>
+                </View>
               </View>
-              <TouchableOpacity
-                onPress={handleEditPhone}
-                style={styles.editPhoneBtn}
-                accessibilityRole="button"
-                accessibilityLabel="Change phone number"
-              >
-                <Text style={styles.editPhoneText} allowFontScaling={true}>
-                  Edit
-                </Text>
-              </TouchableOpacity>
+            ) : null}
+
+            {/* Section 1: Email Address Input */}
+            <View style={styles.section}>
+              <Text style={styles.inputLabel} allowFontScaling={true}>
+                Email Address
+              </Text>
+              <View style={[styles.fieldRow, Boolean(emailError) && styles.fieldError]}>
+                <Ionicons
+                  name="mail-outline"
+                  size={20}
+                  color={Boolean(emailError) ? COLORS.danger : COLORS.brand}
+                  style={styles.fieldIcon}
+                />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. name@example.com"
+                  placeholderTextColor={COLORS.placeholder}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  value={email}
+                  onChangeText={(val) => {
+                    setEmail(val);
+                    if (emailError) setEmailError('');
+                  }}
+                  accessibilityLabel="Email address input"
+                  allowFontScaling={true}
+                />
+                {email.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setEmail('')}
+                    style={styles.clearBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear email input"
+                  >
+                    <Ionicons name="close-circle" size={18} color={COLORS.muted} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              {Boolean(emailError) && (
+                <View style={styles.errorRow}>
+                  <Ionicons name="alert-circle" size={16} color={COLORS.danger} />
+                  <Text style={styles.errorText} allowFontScaling={true}>
+                    {emailError}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Dev Mode OTP Banner (for testing ease) */}
@@ -285,7 +323,7 @@ export default function ResetPasswordRoute() {
               </TouchableOpacity>
             ) : null}
 
-            {/* Section 1: 6-Digit OTP Input */}
+            {/* Section 2: 6-Digit OTP Input */}
             <View style={styles.section}>
               <Text style={styles.inputLabel} allowFontScaling={true}>
                 Enter 6-Digit Code
@@ -326,13 +364,13 @@ export default function ResetPasswordRoute() {
               </View>
             </View>
 
-            {/* Section 2: New Password */}
+            {/* Section 3: New Password */}
             <View style={styles.section}>
               <Text style={styles.inputLabel} allowFontScaling={true}>
                 New Password
               </Text>
-              <View style={[styles.passwordField, Boolean(passwordError) && styles.fieldError]}>
-                <Ionicons name="lock-closed-outline" size={20} color={COLORS.brand} style={{ marginRight: 10 }} />
+              <View style={[styles.fieldRow, Boolean(passwordError) && styles.fieldError]}>
+                <Ionicons name="lock-closed-outline" size={20} color={COLORS.brand} style={styles.fieldIcon} />
                 <TextInput
                   style={styles.textInput}
                   placeholder="Enter new password (min. 6 chars)"
@@ -374,13 +412,13 @@ export default function ResetPasswordRoute() {
               )}
             </View>
 
-            {/* Section 3: Confirm New Password */}
+            {/* Section 4: Confirm New Password */}
             <View style={styles.section}>
               <Text style={styles.inputLabel} allowFontScaling={true}>
                 Confirm New Password
               </Text>
-              <View style={[styles.passwordField, Boolean(confirmError) && styles.fieldError]}>
-                <Ionicons name="shield-outline" size={20} color={COLORS.brand} style={{ marginRight: 10 }} />
+              <View style={[styles.fieldRow, Boolean(confirmError) && styles.fieldError]}>
+                <Ionicons name="shield-outline" size={20} color={COLORS.brand} style={styles.fieldIcon} />
                 <TextInput
                   style={styles.textInput}
                   placeholder="Re-type new password"
@@ -432,7 +470,7 @@ export default function ResetPasswordRoute() {
             {/* Submit Button */}
             <View style={styles.buttonWrapper}>
               <PrimaryButton
-                title="Reset Password"
+                title={isSuccess ? 'Password Reset!' : 'Reset Password'}
                 onPress={handleResetPassword}
                 loading={loading}
                 accessibilityLabel="Confirm and reset password"
@@ -490,7 +528,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.family,
     fontWeight: FONTS.weights.medium as any,
   },
-  phoneBadgeContainer: {
+  emailBadgeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -502,30 +540,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2F0E7',
   },
-  phoneBadge: {
+  emailBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  phoneBadgeText: {
+  emailBadgeText: {
     fontSize: FONTS.sizes.sm,
     color: COLORS.text,
     fontFamily: FONTS.family,
+    flex: 1,
   },
-  phoneBadgeBold: {
+  emailBadgeBold: {
     fontWeight: FONTS.weights.bold as any,
     color: COLORS.deep,
-  },
-  editPhoneBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  editPhoneText: {
-    fontSize: FONTS.sizes.sm,
-    fontWeight: FONTS.weights.bold as any,
-    color: COLORS.brand,
-    fontFamily: FONTS.family,
-    textDecorationLine: 'underline',
   },
   devOtpCard: {
     flexDirection: 'row',
@@ -560,7 +588,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginLeft: 4,
   },
-  passwordField: {
+  fieldRow: {
     flexDirection: 'row',
     alignItems: 'center',
     height: METRICS.inputHeight,
@@ -574,12 +602,18 @@ const styles = StyleSheet.create({
     borderColor: COLORS.danger,
     backgroundColor: '#FFF8F8',
   },
+  fieldIcon: {
+    marginRight: 10,
+  },
   textInput: {
     flex: 1,
     height: '100%',
     fontSize: FONTS.sizes.md,
     color: COLORS.text,
     fontFamily: FONTS.family,
+  },
+  clearBtn: {
+    padding: 6,
   },
   eyeBtn: {
     padding: 8,
@@ -642,60 +676,5 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
     fontFamily: FONTS.family,
     textDecorationLine: 'underline',
-  },
-  // Success Card Styles
-  successContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    backgroundColor: COLORS.surface,
-  },
-  successCard: {
-    width: '100%',
-    backgroundColor: COLORS.surface,
-    borderRadius: 24,
-    padding: 28,
-    alignItems: 'center',
-    shadowColor: COLORS.shadowDark,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#E8F3ED',
-  },
-  successIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.brand,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: COLORS.brand,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  successTitle: {
-    fontSize: FONTS.sizes.xl,
-    fontWeight: FONTS.weights.bold as any,
-    color: COLORS.deep,
-    fontFamily: FONTS.family,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  successMessage: {
-    fontSize: FONTS.sizes.body,
-    color: COLORS.muted,
-    fontFamily: FONTS.family,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 28,
-  },
-  successButtonWrapper: {
-    width: '100%',
   },
 });

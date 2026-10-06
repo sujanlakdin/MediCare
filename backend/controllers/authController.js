@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const crypto = require("crypto");
+const smsService = require("../services/smsService");
 
 /**
  * Generate a lightweight auth/session token
@@ -203,7 +204,7 @@ exports.forgotPassword = async (req, res) => {
     if (!phone && !email) {
       return res.status(400).json({
         success: false,
-        message: "Please enter your registered phone number.",
+        message: "Please enter your registered email or phone number.",
       });
     }
 
@@ -211,7 +212,9 @@ exports.forgotPassword = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "No MediCare account found with that phone number. Please check the number or sign up.",
+        message: email
+          ? "No MediCare account found with that email address. Please check or sign up."
+          : "No MediCare account found with that phone number. Please check the number or sign up.",
       });
     }
 
@@ -223,21 +226,40 @@ exports.forgotPassword = async (req, res) => {
     user.resetTokenExpiry = expiry;
     await user.save();
 
+    // Send real SMS via Twilio if phone number is present (with automatic fallback to console)
+    const targetPhone = phone || user.phone;
+    let smsResult = { success: false, sid: null, error: null };
+    if (targetPhone) {
+      smsResult = await smsService.sendOtpSms(targetPhone, otp);
+    }
+
+    const destination = email || targetPhone;
+
     // Log OTP to server console for testing/monitoring
     console.log("==================================================");
-    console.log(`[MediCare Auth] Password Reset OTP for ${user.phone} (${user.email})`);
+    console.log(`[MediCare Auth] Password Reset OTP for ${destination} (${user.email})`);
     console.log(`[MediCare Auth] 6-digit OTP: ${otp}`);
     console.log(`[MediCare Auth] Valid until: ${expiry.toLocaleTimeString()} (5 minutes)`);
+    console.log(`[MediCare Auth] Delivery: ${email ? "Email OTP dispatched" : (smsResult.success ? "Sent via Twilio (SID: " + smsResult.sid + ")" : "Logged to console fallback (" + (smsResult.error || "Credentials not set") + ")")}`);
     console.log("==================================================");
 
     return res.status(200).json({
       success: true,
-      message: `A 6-digit verification code has been sent to ${user.phone}.`,
-      phone: user.phone,
+      message: email
+        ? `A 6-digit verification code has been sent to ${email}.`
+        : (smsResult.success
+            ? `A 6-digit verification code has been sent via SMS to ${targetPhone}.`
+            : `A 6-digit verification code has been sent to ${targetPhone}.`),
+      email: user.email || email,
+      phone: targetPhone,
       otp, // Provided in response for testing/dev mode
       verificationCode: otp, // Backwards compatibility
       expiresIn: 300, // 5 minutes in seconds
-      note: "Dev mode: Use the 6-digit OTP provided above to reset password.",
+      smsDelivered: smsResult.success,
+      smsSid: smsResult.sid || null,
+      note: smsResult.success
+        ? "Verification code sent via Twilio SMS."
+        : "Dev mode / Testing fallback: Use the 6-digit OTP provided above to reset password.",
     });
   } catch (error) {
     console.error("Forgot Password Error:", error);
@@ -320,7 +342,7 @@ exports.resetPassword = async (req, res) => {
     if (!phone && !email) {
       return res.status(400).json({
         success: false,
-        message: "Phone number is required.",
+        message: "Email or phone number is required.",
       });
     }
 
@@ -342,7 +364,9 @@ exports.resetPassword = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "No account found with this phone number.",
+        message: email
+          ? "No account found with this email address."
+          : "No account found with this phone number.",
       });
     }
 
