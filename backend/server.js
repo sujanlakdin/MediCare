@@ -67,8 +67,8 @@ mongoose
 const profileRoutes = require("./routes/profileRoutes");
 const medicationRoutes = require("./routes/medicationRoutes");
 
-app.use("/api/profile", profileRoutes);
-app.use("/api/medications", medicationRoutes);
+app.use("/api/profile", authenticate, profileRoutes);
+app.use("/api/medications", authenticate, medicationRoutes);
 
 app.get("/", (req, res) => {
   res.json({

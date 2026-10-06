@@ -58,7 +58,7 @@ export default function EditProfileScreen() {
 
   useEffect(() => {
     void loadProfile();
-  }, [loadProfile]);
+  }, []);
 
   async function handleSave() {
     if (!fullName.trim() || !email.trim()) {

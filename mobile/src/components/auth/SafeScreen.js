@@ -3,8 +3,6 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   ScrollView,
-  Pressable,
-  Keyboard,
   Platform,
   StyleSheet,
   StatusBar,
@@ -33,11 +31,7 @@ export default function SafeScreen({
   barStyle = 'light-content',
   backgroundColor = COLORS.surface,
 }) {
-  const handleDismissKeyboard = () => {
-    if (Platform.OS !== 'web') {
-      Keyboard.dismiss();
-    }
-  };
+  const KeyboardWrapper = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
 
   const renderContent = () => (
     <View style={[styles.contentContainer, contentContainerStyle]}>
@@ -45,39 +39,26 @@ export default function SafeScreen({
     </View>
   );
 
-  const innerContent =
-    Platform.OS === 'web' ? (
-      renderContent()
-    ) : (
-      <Pressable
-        onPress={handleDismissKeyboard}
-        style={styles.pressableWrapper}
-        accessible={false}
-      >
-        {renderContent()}
-      </Pressable>
-    );
-
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }, style]}>
       <StatusBar barStyle={barStyle} backgroundColor={backgroundColor} />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.keyboardAvoid}
-      >
+      <KeyboardWrapper
+        {...(Platform.OS === 'ios' ? { behavior: 'padding' } : {})}
+        style={styles.keyboardAvoid}>
         {scrollable ? (
           <ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="none"
             showsVerticalScrollIndicator={false}
           >
-            {innerContent}
+            {renderContent()}
           </ScrollView>
         ) : (
-          innerContent
+          renderContent()
         )}
-      </KeyboardAvoidingView>
+      </KeyboardWrapper>
     </SafeAreaView>
   );
 }
@@ -95,12 +76,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
-  pressableWrapper: {
-    flexGrow: 1,
-    flex: 1,
-  },
   contentContainer: {
     flexGrow: 1,
-    flex: 1,
   },
 });

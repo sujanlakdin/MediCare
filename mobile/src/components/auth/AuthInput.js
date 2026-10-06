@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   TextInput,
@@ -222,7 +222,7 @@ export default function AuthInput({
   style,
   ...rest
 }) {
-  const [focused, setFocused] = useState(false);
+  const focusedRef = useRef(false);
   const [showPassword, setShowPassword] = useState(!isPassword);
 
   const hasError = Boolean(error);
@@ -232,7 +232,7 @@ export default function AuthInput({
       <View
         style={[
           styles.inputWrapper,
-          focused && styles.inputWrapperFocused,
+          focusedRef.current && styles.inputWrapperFocused,
           hasError && styles.inputWrapperError,
         ]}
       >
@@ -240,7 +240,7 @@ export default function AuthInput({
         <View style={styles.iconContainer}>
           <FieldIcon
             name={icon}
-            color={hasError ? COLORS.danger : focused ? COLORS.brand : COLORS.brand}
+            color={hasError ? COLORS.danger : focusedRef.current ? COLORS.brand : COLORS.brand}
           />
         </View>
 
@@ -254,11 +254,11 @@ export default function AuthInput({
           secureTextEntry={isPassword && !showPassword}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
-          autoComplete={autoComplete}
+          autoComplete={Platform.OS === 'android' ? 'off' : autoComplete}
           editable={editable}
           allowFontScaling={true}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          onFocus={() => { focusedRef.current = true; }}
+          onBlur={() => { focusedRef.current = false; }}
           accessibilityLabel={accessibilityLabel || placeholder}
           accessibilityRole="text"
           {...rest}

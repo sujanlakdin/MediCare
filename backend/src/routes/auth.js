@@ -95,15 +95,11 @@ router.post("/forgot-password", async (req, res) => {
     { $set: { resetToken: otp, resetTokenExpiry: expiry } }
   );
 
-  console.log(`[MediCare Auth] Password reset code for ${user.email}: ${otp}`);
   res.json({
     success: true,
     message: `A 6-digit verification code has been sent to ${user.email}.`,
     phone: user.phone || user.email,
-    otp,
-    verificationCode: otp,
     expiresIn: 300,
-    note: "Development mode: the verification code is included in this response.",
   });
 });
 

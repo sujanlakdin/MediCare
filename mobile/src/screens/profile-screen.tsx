@@ -2,14 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
 import { launchCameraAsync, launchImageLibraryAsync, requestCameraPermissionsAsync, requestMediaLibraryPermissionsAsync, type ImagePickerAsset } from 'expo-image-picker';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { CareIcon } from '@/components/care-icon';
+import { LogoutButton } from '@/components/logout-button';
 import { Screen } from '@/components/screen';
 import { useAccessibility } from '@/contexts/accessibility-context';
 import { useAuth } from '@/contexts/auth-context';
 import { ApiError } from '@/services/api';
-import { getProfile, removeProfilePhoto, type Profile, uploadProfilePhoto } from '@/services/medicare-api';
+import { getProfile, removeProfilePhoto, type Profile, updateProfile, uploadProfilePhoto } from '@/services/medicare-api';
 
 const DEFAULT_PROFILE = {
   fullName: 'Chathura Rajapakse',
@@ -33,6 +34,9 @@ export default function ProfileScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
   const [photoVersion, setPhotoVersion] = useState(Date.now());
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingName, setEditingName] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
 
   const loadProfile = useCallback(async () => {
     if (!token) {
@@ -178,6 +182,37 @@ export default function ProfileScreen() {
     ]);
   };
 
+  const handleStartEditName = () => {
+    setEditingName(displayName);
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!token || !editingName.trim()) {
+      setIsEditingName(false);
+      return;
+    }
+
+    setIsSavingName(true);
+    try {
+      await updateProfile(token, { fullName: editingName.trim() });
+      setProfile((current) => (current ? { ...current, fullName: editingName.trim() } : current));
+      setIsEditingName(false);
+    } catch (requestError) {
+      Alert.alert(
+        'Profile Name',
+        requestError instanceof ApiError ? requestError.message : 'Unable to update your name. Please try again.'
+      );
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const handleCancelEditName = () => {
+    setIsEditingName(false);
+    setEditingName('');
+  };
+
   // Derive display values from profile or fallback to the reference mockup
   const displayName = profile?.fullName?.trim() || DEFAULT_PROFILE.fullName;
   const displayEmail = profile?.email?.trim() || DEFAULT_PROFILE.email;
@@ -233,14 +268,52 @@ export default function ProfileScreen() {
               style={styles.cameraButton}>
               <Ionicons name="camera" size={18} color="#FFFFFF" />
             </Pressable>
-            <Text
-              style={[
-                styles.nameText,
-                settings.fontSize === 'large' && styles.largeNameText,
-                settings.fontSize === 'extraLarge' && styles.extraLargeNameText,
-              ]}>
-              {displayName}
-            </Text>
+            {isEditingName ? (
+              <View style={styles.nameEditContainer}>
+                <TextInput
+                  style={[
+                    styles.nameInput,
+                    settings.fontSize === 'large' && styles.largeNameInput,
+                    settings.fontSize === 'extraLarge' && styles.extraLargeNameInput,
+                  ]}
+                  value={editingName}
+                  onChangeText={setEditingName}
+                  placeholder="Full Name"
+                  placeholderTextColor="#9CB0A6"
+                  autoFocus
+                  onSubmitEditing={handleSaveName}
+                />
+                <View style={styles.nameEditActions}>
+                  <Pressable
+                    onPress={handleCancelEditName}
+                    style={styles.nameEditButton}
+                    disabled={isSavingName}>
+                    <Ionicons name="close" size={18} color="#71827A" />
+                  </Pressable>
+                  <Pressable
+                    onPress={handleSaveName}
+                    style={styles.nameEditButton}
+                    disabled={isSavingName}>
+                    {isSavingName ? (
+                      <ActivityIndicator size={18} color="#22996E" />
+                    ) : (
+                      <Ionicons name="checkmark" size={18} color="#22996E" />
+                    )}
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <Pressable onPress={handleStartEditName} style={styles.namePressable}>
+                <Text
+                  style={[
+                    styles.nameText,
+                    settings.fontSize === 'large' && styles.largeNameText,
+                    settings.fontSize === 'extraLarge' && styles.extraLargeNameText,
+                  ]}>
+                  {displayName}
+                </Text>
+              </Pressable>
+            )}
             <View style={styles.ageBadge}>
               <Text style={styles.ageBadgeText}>{displayAge}</Text>
             </View>
@@ -329,6 +402,8 @@ export default function ProfileScreen() {
             <Text style={styles.caregiverTitle}>Caregiver & Emergency</Text>
             <CareIcon name="chevron-right" size={18} color="#71827A" />
           </Pressable>
+
+          <LogoutButton largerButtons={settings.largerButtons} />
         </>
       )}
 
@@ -450,6 +525,42 @@ const styles = StyleSheet.create({
   },
   extraLargeNameText: {
     fontSize: 28,
+  },
+  namePressable: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  nameEditContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  nameInput: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0E3E2F',
+    letterSpacing: -0.2,
+    minWidth: 200,
+    textAlign: 'center',
+    paddingVertical: 4,
+  },
+  largeNameInput: {
+    fontSize: 25,
+  },
+  extraLargeNameInput: {
+    fontSize: 28,
+  },
+  nameEditActions: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  nameEditButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F9F5',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   ageBadge: {
     backgroundColor: '#E7F5EE',

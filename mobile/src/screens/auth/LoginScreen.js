@@ -185,7 +185,7 @@ export default function LoginScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   formBody: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: COLORS.surface,
     paddingHorizontal: 28,
     paddingTop: 8,
@@ -206,8 +206,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 'auto',
-    paddingTop: 24,
+    marginTop: 24,
     gap: 6,
   },
   switchText: {

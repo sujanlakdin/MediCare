@@ -223,21 +223,11 @@ exports.forgotPassword = async (req, res) => {
     user.resetTokenExpiry = expiry;
     await user.save();
 
-    // Log OTP to server console for testing/monitoring
-    console.log("==================================================");
-    console.log(`[MediCare Auth] Password Reset OTP for ${user.phone} (${user.email})`);
-    console.log(`[MediCare Auth] 6-digit OTP: ${otp}`);
-    console.log(`[MediCare Auth] Valid until: ${expiry.toLocaleTimeString()} (5 minutes)`);
-    console.log("==================================================");
-
     return res.status(200).json({
       success: true,
       message: `A 6-digit verification code has been sent to ${user.phone}.`,
       phone: user.phone,
-      otp, // Provided in response for testing/dev mode
-      verificationCode: otp, // Backwards compatibility
-      expiresIn: 300, // 5 minutes in seconds
-      note: "Dev mode: Use the 6-digit OTP provided above to reset password.",
+      expiresIn: 300,
     });
   } catch (error) {
     console.error("Forgot Password Error:", error);
