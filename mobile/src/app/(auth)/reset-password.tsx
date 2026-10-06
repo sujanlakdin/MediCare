@@ -138,7 +138,7 @@ export default function ResetPasswordRoute() {
       setPasswordError('Please enter a new password');
       valid = false;
     } else if (newPassword.length < 6) {
-      setPasswordError('Password must be at least 6 characters');
+      setPasswordError('Password must be at least 10 characters');
       valid = false;
     } else {
       setPasswordError('');

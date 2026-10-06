@@ -31,7 +31,7 @@ export default function SettingsScreen() {
       id: 'profile',
       title: 'Profile Settings',
       icon: 'profile',
-      onPress: () => router.push('/profile' as Href),
+      onPress: () => router.push('/(app)/(tabs)/profile' as Href),
     },
     {
       id: 'notifications',
@@ -71,7 +71,9 @@ export default function SettingsScreen() {
       {
         text: 'Log Out',
         style: 'destructive',
-        onPress: () => void signOut(),
+        onPress: () => {
+          void signOut().then(() => router.replace('/(auth)/login' as Href));
+        },
       },
     ]);
   }

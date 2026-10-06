@@ -18,11 +18,12 @@ import AuthHeader from '../../components/auth/AuthHeader';
 import PrimaryButton from '../../components/auth/PrimaryButton';
 import StepIndicator from '../../components/auth/StepIndicator';
 import Toast from '../../components/auth/Toast';
+import { isEmail } from '../../components/auth/validation';
 import authService from '../../services/authService';
 
 /**
  * ForgotPasswordScreen (Step 1 of 2)
- * Mobile frontend screen allowing the user to enter their Phone Number and request a 6-digit OTP.
+ * Allows the user to enter their registered email or phone number and request a 6-digit OTP.
  */
 export default function ForgotPasswordRoute() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -51,34 +52,35 @@ export default function ForgotPasswordRoute() {
   };
 
   const handleRequestOtp = async () => {
-    const rawNumber = phoneNumber.trim();
-    if (!rawNumber) {
-      setError('Please enter your registered phone number');
+    const rawIdentifier = phoneNumber.trim();
+    if (!rawIdentifier) {
+      setError('Please enter your registered email or phone number');
       return;
     }
 
-    // Clean digits
-    const digitsOnly = rawNumber.replace(/\D/g, '');
-    if (digitsOnly.length < 7) {
-      setError('Please enter a valid phone number (at least 7-9 digits)');
-      return;
-    }
-
-    // Format full phone
-    let fullPhone = rawNumber;
-    if (!fullPhone.startsWith('+')) {
-      if (fullPhone.startsWith('0')) {
-        // e.g. 077 123 4567 -> +94 77 123 4567
-        fullPhone = countryCode + ' ' + fullPhone.slice(1);
-      } else {
-        fullPhone = countryCode + ' ' + fullPhone;
+    let identifier = rawIdentifier;
+    if (rawIdentifier.includes('@')) {
+      if (!isEmail(rawIdentifier)) {
+        setError('Please enter a valid email address');
+        return;
+      }
+    } else {
+      const digitsOnly = rawIdentifier.replace(/\D/g, '');
+      if (digitsOnly.length < 7) {
+        setError('Please enter a valid email or phone number');
+        return;
+      }
+      if (!identifier.startsWith('+')) {
+        identifier = identifier.startsWith('0')
+          ? `${countryCode} ${identifier.slice(1)}`
+          : `${countryCode} ${identifier}`;
       }
     }
 
     setLoading(true);
     setError('');
     try {
-      const response = await authService.sendResetCode(fullPhone);
+      const response = await authService.sendResetCode(identifier);
 
       const otp = response.otp || response.demoCode;
       if (otp) {
@@ -92,7 +94,7 @@ export default function ForgotPasswordRoute() {
         router.push({
           pathname: '/(auth)/reset-password',
           params: {
-            phone: fullPhone,
+            phone: identifier,
             devOtp: otp || '',
           },
         } as any);
@@ -144,7 +146,7 @@ export default function ForgotPasswordRoute() {
                 Forgot Password?
               </Text>
               <Text style={styles.subheading} allowFontScaling={true}>
-                Enter your registered phone number. We will send you a 6-digit OTP code to safely reset your password.
+                Enter your registered email or phone number. We will send a 6-digit OTP code to safely reset your password.
               </Text>
             </View>
 
@@ -162,33 +164,33 @@ export default function ForgotPasswordRoute() {
               </Text>
             </TouchableOpacity>
 
-            {/* Phone Number Input Row */}
+            {/* Email or Phone Input Row */}
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel} allowFontScaling={true}>
-                Phone Number
+                Email or Phone Number
               </Text>
               <View style={[styles.phoneRow, Boolean(error) && styles.phoneRowError]}>
-                {/* Country Code Pill */}
-                <View style={styles.countryCodeBadge}>
-                  <Text style={styles.flagIcon}>🇱🇰</Text>
-                  <Text style={styles.countryCodeText} allowFontScaling={true}>
-                    {countryCode}
-                  </Text>
-                </View>
+                {!phoneNumber.includes('@') && (
+                  <View style={styles.countryCodeBadge}>
+                    <Text style={styles.flagIcon}>🇱🇰</Text>
+                    <Text style={styles.countryCodeText} allowFontScaling={true}>
+                      {countryCode}
+                    </Text>
+                  </View>
+                )}
 
-                {/* Number Input */}
                 <TextInput
                   style={styles.phoneInput}
-                  placeholder="77 123 4567"
+                  placeholder="Email address or phone number"
                   placeholderTextColor={COLORS.placeholder}
-                  keyboardType="phone-pad"
-                  autoComplete="tel"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
                   value={phoneNumber}
                   onChangeText={handlePhoneChange}
                   returnKeyType="done"
                   onSubmitEditing={handleRequestOtp}
-                  accessibilityLabel="Phone number input"
-                  accessibilityHint="Enter your mobile phone number to receive an OTP"
+                  accessibilityLabel="Email address or phone number"
+                  accessibilityHint="Enter your registered email address or phone number"
                   allowFontScaling={true}
                 />
 
@@ -197,7 +199,7 @@ export default function ForgotPasswordRoute() {
                     onPress={() => setPhoneNumber('')}
                     style={styles.clearBtn}
                     accessibilityRole="button"
-                    accessibilityLabel="Clear phone number"
+                    accessibilityLabel="Clear email or phone number"
                   >
                     <Ionicons name="close-circle" size={18} color={COLORS.muted} />
                   </TouchableOpacity>
@@ -231,7 +233,7 @@ export default function ForgotPasswordRoute() {
                 title="Send Verification Code"
                 onPress={handleRequestOtp}
                 loading={loading}
-                accessibilityLabel="Send OTP verification code to phone number"
+                accessibilityLabel="Send OTP verification code"
               />
             </View>
 

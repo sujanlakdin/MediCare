@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import SafeScreen from '../../components/auth/SafeScreen';
 import Toast from '../../components/auth/Toast';
 import { PATIENT_COLORS } from '../../constants/patientTheme';
+import { useAuth } from '../../contexts/auth-context';
 import {
   useMedications,
   getFlattenedDoses,
@@ -18,32 +19,22 @@ import {
   getCurrentTime24,
   markDoseTaken,
 } from '../../services/medicationService';
-import authService from '../../services/authService';
 import ProgressRing from '../../components/patient/ProgressRing';
 import BottomNav from '../../components/patient/BottomNav';
 import PatientIcon from '../../components/patient/PatientIcons';
 
 export default function DashboardScreen() {
   const medications = useMedications();
+  const { user, signOut } = useAuth();
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
-  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
   const [accountModalVisible, setAccountModalVisible] = useState(false);
 
-  useEffect(() => {
-    const unsubscribe = authService.subscribe?.((user: any) => {
-      setCurrentUser(user);
-    });
-    return () => {
-      unsubscribe?.();
-    };
-  }, []);
-
-  const displayName = currentUser?.full_name ? currentUser.full_name.split(' ')[0] : 'Chathura';
-  const fullName = currentUser?.full_name || 'Chathura Rajapakse';
-  const email = currentUser?.email || 'chathura.rajapakse@medicare.com';
-  const avatarInitials = currentUser?.full_name
-    ? currentUser.full_name
+  const displayName = user?.fullName ? user.fullName.split(' ')[0] : 'Chathura';
+  const fullName = user?.fullName || 'Chathura Rajapakse';
+  const email = user?.email || '';
+  const avatarInitials = user?.fullName
+    ? user.fullName
         .split(' ')
         .map((n: string) => n[0])
         .join('')
@@ -58,21 +49,22 @@ export default function DashboardScreen() {
 
   const handleSignOut = async () => {
     setAccountModalVisible(false);
-    await authService.logout();
+    await signOut();
     showToast('Signed out of MediCare');
     setTimeout(() => {
-      router.replace('/?route=Welcome' as any);
+      router.replace('/(auth)/login' as any);
     }, 400);
   };
 
-  const handleSwitchAccount = () => {
+  const handleSwitchAccount = async () => {
     setAccountModalVisible(false);
-    router.replace('/?route=Login' as any);
+    await signOut();
+    router.replace('/(auth)/login' as any);
   };
 
   const handleViewProfile = () => {
     setAccountModalVisible(false);
-    router.push('/(patient)/profile' as any);
+    router.push('/(app)/(tabs)/profile' as any);
   };
 
   // Time-of-day greeting
@@ -326,7 +318,7 @@ export default function DashboardScreen() {
                 </Text>
                 <View style={styles.roleTag}>
                   <Text style={styles.roleTagText} allowFontScaling={true}>
-                    {currentUser?.role === 'caregiver' ? 'Caregiver' : 'Patient'}
+                    {user?.role === 'caregiver' ? 'Caregiver' : 'Patient'}
                   </Text>
                 </View>
               </View>

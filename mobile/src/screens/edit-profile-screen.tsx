@@ -84,7 +84,7 @@ export default function EditProfileScreen() {
           dateOfBirth,
         });
       }
-      router.replace('/profile' as Href);
+      router.replace('/(app)/(tabs)/profile' as Href);
     } catch (err) {
       setError(
         err instanceof ApiError

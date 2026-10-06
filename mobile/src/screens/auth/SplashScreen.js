@@ -10,7 +10,7 @@ import {
 import { router } from 'expo-router';
 import { COLORS, FONTS } from '../../theme';
 import MedicareLogo from '../../components/auth/MedicareLogo';
-import authService from '../../services/authService';
+import { useAuth } from '../../contexts/auth-context';
 
 /**
  * SplashScreen
@@ -19,6 +19,8 @@ import authService from '../../services/authService';
  * Otherwise, transitions to Welcome screen.
  */
 export default function SplashScreen({ navigation }) {
+  const { token } = useAuth();
+
   useEffect(() => {
     const timer = setTimeout(() => {
       goToNext();
@@ -28,23 +30,7 @@ export default function SplashScreen({ navigation }) {
   }, []);
 
   const goToNext = () => {
-    if (authService.isAuthenticated && authService.isAuthenticated()) {
-      if (navigation?.navigate) {
-        try {
-          navigation.navigate('/(patient)/dashboard');
-        } catch (e) {
-          router.replace('/(patient)/dashboard');
-        }
-      } else {
-        router.replace('/(patient)/dashboard');
-      }
-    } else {
-      if (navigation?.replace) {
-        navigation.replace('Welcome');
-      } else if (navigation?.navigate) {
-        navigation.navigate('Welcome');
-      }
-    }
+    router.replace(token ? '/' : '/(auth)/welcome');
   };
 
   return (

@@ -8,6 +8,7 @@ export type AuthUser = {
   id: string;
   fullName: string;
   email: string;
+  role?: 'patient' | 'caregiver';
 };
 
 type AuthContextValue = {
@@ -15,7 +16,7 @@ type AuthContextValue = {
   user: AuthUser | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  register: (fullName: string, email: string, password: string) => Promise<void>;
+  register: (fullName: string, email: string, password: string, role?: 'patient' | 'caregiver') => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -89,8 +90,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     await authenticate('/api/auth/login', { email, password });
   }
 
-  async function register(fullName: string, email: string, password: string) {
-    await authenticate('/api/auth/register', { fullName, email, password });
+  async function register(fullName: string, email: string, password: string, role: 'patient' | 'caregiver' = 'patient') {
+    await authenticate('/api/auth/register', { fullName, email, password, role });
   }
 
   async function signOut() {

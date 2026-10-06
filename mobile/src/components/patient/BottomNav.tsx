@@ -21,9 +21,9 @@ interface NavItemDef {
 const NAV_ITEMS: NavItemDef[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'home', route: '/(patient)/dashboard' },
   { key: 'medications', label: 'Medications', icon: 'pill', route: '/(patient)/medications' },
-  { key: 'reminders', label: 'Reminders', icon: 'bell' },
-  { key: 'adherence', label: 'Adherence', icon: 'chart' },
-  { key: 'profile', label: 'Profile', icon: 'user' },
+  { key: 'reminders', label: 'Reminders', icon: 'bell', route: '/settings/notifications' },
+  { key: 'adherence', label: 'Adherence', icon: 'chart', route: '/(patient)/dashboard' },
+  { key: 'profile', label: 'Profile', icon: 'user', route: '/(app)/(tabs)/profile' },
 ];
 
 /**
@@ -31,17 +31,14 @@ const NAV_ITEMS: NavItemDef[] = [
  * 5 items matching the reference layout:
  * - Dashboard: navigates to /dashboard
  * - Medications: navigates to /medications
- * - Reminders, Adherence, Profile: shows toast notification for other team members
+ * - Reminders opens notification settings; Adherence opens its dashboard summary;
+ *   Profile opens the shared profile screen.
  */
-export default function BottomNav({ currentTab, onShowToast }: BottomNavProps) {
+export default function BottomNav({ currentTab }: BottomNavProps) {
   const handlePress = (item: NavItemDef) => {
     if (item.route) {
       if (item.key === currentTab) return;
       router.replace(item.route as any);
-    } else {
-      if (onShowToast) {
-        onShowToast('This screen belongs to another team member');
-      }
     }
   };
 

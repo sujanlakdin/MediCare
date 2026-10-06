@@ -1,12 +1,5 @@
 import { router, type Href } from 'expo-router';
-import { useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CareIcon, type CareIconName } from '@/components/care-icon';
 import { Screen } from '@/components/screen';
@@ -25,16 +18,6 @@ export default function MainMenuScreen() {
   const { user } = useAuth();
   const { settings: a11y } = useAccessibility();
 
-  const [moduleNotice, setModuleNotice] = useState<{
-    visible: boolean;
-    title: string;
-    description: string;
-  }>({
-    visible: false,
-    title: '',
-    description: '',
-  });
-
   const patientName = user?.fullName || 'Chathura Rajapakse';
 
   const menuItems: MenuItem[] = [
@@ -43,49 +26,28 @@ export default function MainMenuScreen() {
       title: 'Dashboard',
       subtitle: 'Main health & adherence tracking',
       icon: 'dashboard',
-      onPress: () => router.push('/' as Href),
+      onPress: () => router.push('/(patient)/dashboard' as Href),
     },
     {
       id: 'medications',
       title: 'Medications',
       subtitle: 'View your active medications',
       icon: 'pharmacist',
-      onPress: () => {
-        setModuleNotice({
-          visible: true,
-          title: 'Medications Module',
-          description:
-            'This module manages patient pill schedules and dosages. When active prescriptions are synchronized, your medications will display here.',
-        });
-      },
+      onPress: () => router.push('/(patient)/medications' as Href),
     },
     {
       id: 'schedule',
       title: 'Schedule',
       subtitle: 'Morning, noon & evening checklists',
       icon: 'reports',
-      onPress: () => {
-        setModuleNotice({
-          visible: true,
-          title: 'Medication Schedule',
-          description:
-            'View your upcoming morning, noon, and evening dose reminders. Configure your interval preferences in Notification Settings.',
-        });
-      },
+      onPress: () => router.push('/settings/notifications' as Href),
     },
     {
       id: 'adherence',
       title: 'Adherence',
       subtitle: 'Adherence performance & progress metrics',
       icon: 'reports',
-      onPress: () => {
-        setModuleNotice({
-          visible: true,
-          title: 'Adherence Tracker',
-          description:
-            'Monitor your weekly and monthly compliance scores to keep track of taken versus missed doses.',
-        });
-      },
+      onPress: () => router.push('/(patient)/dashboard' as Href),
     },
     {
       id: 'caregiver',
@@ -99,7 +61,7 @@ export default function MainMenuScreen() {
       title: 'Profile',
       subtitle: `${patientName}'s details`,
       icon: 'profile',
-      onPress: () => router.push('/profile' as Href),
+      onPress: () => router.push('/(app)/(tabs)/profile' as Href),
     },
     {
       id: 'settings',
@@ -148,31 +110,6 @@ export default function MainMenuScreen() {
         ))}
       </View>
 
-      {/* Module Info Notice Modal */}
-      <Modal
-        visible={moduleNotice.visible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() =>
-          setModuleNotice((prev) => ({ ...prev, visible: false }))
-        }>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <View style={styles.modalHeader}>
-              <CareIcon name="pharmacist" size={24} color="#22996E" />
-              <Text style={styles.modalTitle}>{moduleNotice.title}</Text>
-            </View>
-            <Text style={styles.modalBody}>{moduleNotice.description}</Text>
-            <Pressable
-              onPress={() =>
-                setModuleNotice((prev) => ({ ...prev, visible: false }))
-              }
-              style={styles.modalCloseBtn}>
-              <Text style={styles.modalCloseBtnText}>Understood</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
     </Screen>
   );
 }
@@ -226,48 +163,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.75,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    width: '100%',
-    maxWidth: 420,
-    gap: 12,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0E3E2F',
-  },
-  modalBody: {
-    fontSize: 14,
-    color: '#4A6054',
-    lineHeight: 20,
-  },
-  modalCloseBtn: {
-    backgroundColor: '#0E3E2F',
-    height: 44,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 6,
-  },
-  modalCloseBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 15,
   },
 });

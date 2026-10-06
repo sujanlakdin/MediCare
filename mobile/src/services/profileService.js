@@ -1,5 +1,5 @@
-import { Platform } from "react-native";
 import { authService } from "./authService";
+import { API_BASE_URL } from "./api-config";
 
 /**
  * Member 1: Profile & Accessibility Service
@@ -9,15 +9,7 @@ import { authService } from "./authService";
  * 2. Accessibility CRUD: Read settings, Update elderly accessibility preferences
  */
 
-const DEFAULT_PORT = 5000;
-const getBaseUrl = () => {
-  if (Platform.OS === "android") {
-    return `http://10.0.2.2:${DEFAULT_PORT}/api/profile`;
-  }
-  return `http://localhost:${DEFAULT_PORT}/api/profile`;
-};
-
-export const API_PROFILE_URL = getBaseUrl();
+export const API_PROFILE_URL = `${API_BASE_URL}/api/profile`;
 
 // Listeners for dynamic theme/accessibility changes across screens
 const listeners = new Set();

@@ -37,6 +37,7 @@ const userSchema = new mongoose.Schema(
     fullName: { type: String, required: true, trim: true, maxlength: 120 },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254 },
     passwordHash: { type: String, required: true, select: false },
+    role: { type: String, enum: ["patient", "caregiver"], default: "patient" },
     phone: { type: String, default: "", trim: true, maxlength: 30 },
     dateOfBirth: { type: String, default: "" },
     gender: { type: String, default: "", trim: true, maxlength: 60 },
@@ -45,6 +46,8 @@ const userSchema = new mongoose.Schema(
     notificationSettings: { type: notificationSettingsSchema, default: () => ({}) },
     accessibilitySettings: { type: accessibilitySettingsSchema, default: () => ({}) },
     emergencyContact: { type: emergencyContactSchema, default: () => ({}) },
+    resetToken: { type: String, default: null },
+    resetTokenExpiry: { type: Date, default: null },
   },
   { timestamps: true }
 );

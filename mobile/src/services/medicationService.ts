@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { Platform } from 'react-native';
+import { API_BASE_URL } from './api-config';
 
 /**
  * Type Medication Definition
@@ -105,9 +105,6 @@ const INITIAL_MEDICATIONS: Medication[] = [
 ];
 
 // Backend API endpoint configuration
-const API_BASE_URL =
-  Platform.OS === 'android' ? 'http://10.0.2.2:5000' : 'http://localhost:5000';
-
 function normalizeMedication(raw: any): Medication {
   const id = raw.id || raw._id || String(Date.now());
   let takenObj: Record<string, boolean> = {};

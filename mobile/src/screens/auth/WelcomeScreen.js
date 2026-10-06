@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import { router } from 'expo-router';
 import { COLORS, FONTS } from '../../theme';
 import MedicareLogo from '../../components/auth/MedicareLogo';
 import PrimaryButton from '../../components/auth/PrimaryButton';
-import authService from '../../services/authService';
+import { useAuth } from '../../contexts/auth-context';
 
 let RNSvg = null;
 try {
@@ -28,33 +28,14 @@ const { width, height } = Dimensions.get('window');
  */
 export default function WelcomeScreen({ navigation }) {
   const isWeb = Platform.OS === 'web';
-
-  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    authService.isAuthenticated ? authService.isAuthenticated() : Boolean(currentUser)
-  );
-
-  useEffect(() => {
-    const unsubscribe = authService.subscribe?.((user) => {
-      setCurrentUser(user);
-      setIsAuthenticated(Boolean(user));
-    });
-    return () => unsubscribe?.();
-  }, []);
+  const { token, user } = useAuth();
+  const isAuthenticated = Boolean(token && user);
 
   const goToDashboard = () => {
-    if (navigation?.navigate) {
-      try {
-        navigation.navigate('/(patient)/dashboard');
-      } catch (e) {
-        router.replace('/(patient)/dashboard');
-      }
-    } else {
-      router.replace('/(patient)/dashboard');
-    }
+    router.replace('/');
   };
 
-  const firstName = currentUser?.full_name ? currentUser.full_name.split(' ')[0] : 'Patient';
+  const firstName = user?.fullName ? user.fullName.split(' ')[0] : 'Patient';
 
   const renderBackgroundArt = () => {
     if (isWeb) {

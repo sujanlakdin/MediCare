@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -13,14 +13,15 @@ import AuthInput from '../../components/auth/AuthInput';
 import PrimaryButton from '../../components/auth/PrimaryButton';
 import SocialButtons from '../../components/auth/SocialButtons';
 import Toast from '../../components/auth/Toast';
-import { isValidEmailOrPhone } from '../../components/auth/validation';
-import authService from '../../services/authService';
+import { isEmail } from '../../components/auth/validation';
+import { useAuth } from '../../contexts/auth-context';
 
 /**
  * LoginScreen Component
  * Authenticates patient or caregiver via Email or Sri Lankan phone number.
  */
 export default function LoginScreen({ navigation }) {
+  const { signIn } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
 
@@ -31,20 +32,6 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
-
-  // Active session detection for seamless auth/dashboard switching
-  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    authService.isAuthenticated ? authService.isAuthenticated() : Boolean(currentUser)
-  );
-
-  useEffect(() => {
-    const unsubscribe = authService.subscribe?.((user) => {
-      setCurrentUser(user);
-      setIsAuthenticated(Boolean(user));
-    });
-    return () => unsubscribe?.();
-  }, []);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -68,8 +55,8 @@ export default function LoginScreen({ navigation }) {
     if (!cleanId) {
       setIdError('Enter your email or phone number');
       valid = false;
-    } else if (!isValidEmailOrPhone(cleanId)) {
-      setIdError('Enter a valid email or a Sri Lankan phone number');
+    } else if (!isEmail(cleanId)) {
+      setIdError('Enter a valid email address');
       valid = false;
     } else {
       setIdError('');
@@ -93,20 +80,10 @@ export default function LoginScreen({ navigation }) {
 
     setLoading(true);
     try {
-      const response = await authService.login(identifier, password);
-      showToast(response.message || 'Login successful!');
-      
-      // Navigate to patient dashboard upon successful login
+      await signIn(identifier.trim(), password);
+      showToast('Login successful!');
       setTimeout(() => {
-        if (navigation?.navigate) {
-          try {
-            navigation.navigate('/(patient)/dashboard');
-          } catch (e) {
-            router.replace('/(patient)/dashboard');
-          }
-        } else {
-          router.replace('/(patient)/dashboard');
-        }
+        router.replace('/');
       }, 600);
     } catch (err) {
       showToast(err.message || 'Login failed. Please try again.');
@@ -117,18 +94,6 @@ export default function LoginScreen({ navigation }) {
 
   const handleSocialSelect = (provider) => {
     showToast(`${provider} sign-in will be connected to the backend later`);
-  };
-
-  const goToDashboard = () => {
-    if (navigation?.navigate) {
-      try {
-        navigation.navigate('/(patient)/dashboard');
-      } catch (e) {
-        router.replace('/(patient)/dashboard');
-      }
-    } else {
-      router.replace('/(patient)/dashboard');
-    }
   };
 
   return (
@@ -142,38 +107,15 @@ export default function LoginScreen({ navigation }) {
 
       {/* Main Form Body */}
       <View style={styles.formBody}>
-        {/* Seamless Navigation Banner for Authenticated Users */}
-        {isAuthenticated && currentUser && (
-          <View style={styles.authenticatedBanner}>
-            <View style={styles.authBannerTextContainer}>
-              <Text style={styles.authBannerTitle} numberOfLines={1} allowFontScaling={true}>
-                Signed in: {currentUser.full_name || currentUser.email}
-              </Text>
-              <Text style={styles.authBannerSubtitle} allowFontScaling={true}>
-                Active patient session found
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.authBannerButton}
-              onPress={goToDashboard}
-              accessibilityRole="button"
-              accessibilityLabel="Go to Patient Dashboard"
-            >
-              <Text style={styles.authBannerButtonText} allowFontScaling={true}>
-                Dashboard →
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        {/* Email or Phone Field */}
+        {/* Email Field */}
         <AuthInput
           icon="user"
-          placeholder="Email or Phone"
+          placeholder="Email"
           value={identifier}
           onChangeText={handleIdChange}
           error={idError}
           autoComplete="username"
-          accessibilityLabel="Email or Phone number"
+          accessibilityLabel="Email address"
         />
 
         {/* Password Field */}

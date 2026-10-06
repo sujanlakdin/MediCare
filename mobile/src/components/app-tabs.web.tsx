@@ -8,17 +8,16 @@ export default function AppTabs() {
       <TabSlot />
       <TabList asChild>
         <View style={styles.tabBar}>
-          <TabTrigger name="home" href="/" asChild>
+          <TabTrigger name="index" href={'/(app)/(tabs)' as Href} asChild>
             <TabBtn label="Dashboard" />
           </TabTrigger>
-          <TabTrigger name="explore" href={'/explore' as Href} asChild>
+          <TabTrigger name="explore" href={'/(app)/(tabs)/explore' as Href} asChild>
             <TabBtn label="Explore" />
           </TabTrigger>
-          </TabTrigger>
-          <TabTrigger name="profile" href={'/profile' as Href} asChild>
+          <TabTrigger name="profile" href={'/(app)/(tabs)/profile' as Href} asChild>
             <TabBtn label="Profile" />
           </TabTrigger>
-          <TabTrigger name="settings" href={'/settings' as Href} asChild>
+          <TabTrigger name="settings" href={'/(app)/(tabs)/settings' as Href} asChild>
             <TabBtn label="Settings" />
           </TabTrigger>
         </View>

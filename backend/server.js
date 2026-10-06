@@ -5,7 +5,6 @@ if (dns.setDefaultResultOrder) dns.setDefaultResultOrder("ipv4first");
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
-const dns = require("dns");
 const path = require("path");
 require("dotenv").config();
 
@@ -65,11 +64,9 @@ mongoose
   });
 
 // API Routes
-const authRoutes = require("./routes/authRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const medicationRoutes = require("./routes/medicationRoutes");
 
-app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/medications", medicationRoutes);
 

@@ -43,7 +43,16 @@ function RootNavigator() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(app)" />
+      <Stack.Screen name="index" />
+      <Stack.Protected guard={!token}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="sign-in" />
+        <Stack.Screen name="register" />
+      </Stack.Protected>
+      <Stack.Protected guard={Boolean(token)}>
+        <Stack.Screen name="(app)" />
+        <Stack.Screen name="(patient)" />
+      </Stack.Protected>
     </Stack>
   );
 }

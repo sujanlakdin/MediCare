@@ -303,7 +303,7 @@ export default function ProfileScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Edit Profile Details"
-            onPress={() => router.push('/profile/edit' as Href)}
+            onPress={() => router.push('/(app)/(tabs)/profile/edit' as Href)}
             style={({ pressed }) => [
               styles.editButton,
               settings.largerButtons && styles.largeButton,

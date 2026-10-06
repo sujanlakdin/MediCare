@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import SocialButtons from '../../components/auth/SocialButtons';
 import PasswordStrengthMeter from '../../components/auth/PasswordStrengthMeter';
 import Toast from '../../components/auth/Toast';
 import { isEmail, hasRequiredComplexity } from '../../components/auth/validation';
-import authService from '../../services/authService';
+import { useAuth } from '../../contexts/auth-context';
 
 let RNSvg = null;
 try {
@@ -119,6 +119,7 @@ function RoleIcon({ role, active }) {
  * terms check, and inline validation.
  */
 export default function SignUpScreen({ navigation }) {
+  const { register } = useAuth();
   const [role, setRole] = useState('patient'); // 'patient' | 'caregiver'
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -136,20 +137,6 @@ export default function SignUpScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
-
-  // Active session detection for seamless auth/dashboard switching
-  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    authService.isAuthenticated ? authService.isAuthenticated() : Boolean(currentUser)
-  );
-
-  useEffect(() => {
-    const unsubscribe = authService.subscribe?.((user) => {
-      setCurrentUser(user);
-      setIsAuthenticated(Boolean(user));
-    });
-    return () => unsubscribe?.();
-  }, []);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -210,8 +197,8 @@ export default function SignUpScreen({ navigation }) {
     if (!password) {
       setPasswordError('Enter a password');
       valid = false;
-    } else if (password.length < 8) {
-      setPasswordError('Use at least 8 characters');
+    } else if (password.length < 10) {
+      setPasswordError('Use at least 10 characters');
       valid = false;
     } else if (!hasRequiredComplexity(password)) {
       setPasswordError('Add numbers or capital letters');
@@ -248,43 +235,16 @@ export default function SignUpScreen({ navigation }) {
 
     setLoading(true);
     try {
-      const response = await authService.register({
-        name: fullName,
-        email: email.trim(),
-        password,
-        role,
-      });
+      await register(fullName.trim(), email.trim(), password, role);
+      showToast('Account created successfully!');
 
-      showToast(response?.message || 'Account created successfully!');
-
-      // Navigate to patient dashboard upon successful registration
       setTimeout(() => {
-        if (navigation?.navigate) {
-          try {
-            navigation.navigate('/(patient)/dashboard');
-          } catch (e) {
-            router.replace('/(patient)/dashboard');
-          }
-        } else {
-          router.replace('/(patient)/dashboard');
-        }
+        router.replace('/');
       }, 600);
     } catch (err) {
       showToast(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const goToDashboard = () => {
-    if (navigation?.navigate) {
-      try {
-        navigation.navigate('/(patient)/dashboard');
-      } catch (e) {
-        router.replace('/(patient)/dashboard');
-      }
-    } else {
-      router.replace('/(patient)/dashboard');
     }
   };
 
@@ -302,30 +262,6 @@ export default function SignUpScreen({ navigation }) {
       />
 
       <View style={styles.formBody}>
-        {/* Seamless Navigation Banner for Authenticated Users */}
-        {isAuthenticated && currentUser && (
-          <View style={styles.authenticatedBanner}>
-            <View style={styles.authBannerTextContainer}>
-              <Text style={styles.authBannerTitle} numberOfLines={1} allowFontScaling={true}>
-                Signed in: {currentUser.full_name || currentUser.email}
-              </Text>
-              <Text style={styles.authBannerSubtitle} allowFontScaling={true}>
-                Active patient session found
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.authBannerButton}
-              onPress={goToDashboard}
-              accessibilityRole="button"
-              accessibilityLabel="Go to Patient Dashboard"
-            >
-              <Text style={styles.authBannerButtonText} allowFontScaling={true}>
-                Dashboard →
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
         {/* Role Selector: Patient vs Caregiver */}
         <View
           style={styles.roleContainer}

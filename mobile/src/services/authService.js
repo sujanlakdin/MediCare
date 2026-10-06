@@ -15,10 +15,7 @@
  * - created_at: Timestamp (ISO8601)
  */
 
-import { Platform } from 'react-native';
-
-const API_BASE_URL =
-  Platform.OS === 'android' ? 'http://10.0.2.2:5000' : 'http://localhost:5000';
+import { API_BASE_URL } from './api-config';
 
 // Simulated network latency helper
 const delay = (ms = 450) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -203,7 +200,7 @@ export const authService = {
 
       const data = await response.json();
       if (!response.ok || !data.success) {
-        throw new Error(data.message || "Failed to send reset code.");
+        throw new Error(data.message || data.error || "Failed to send reset code.");
       }
 
       return {
@@ -216,19 +213,8 @@ export const authService = {
         expiresIn: data.expiresIn || 300,
       };
     } catch (err) {
-      console.warn("sendResetCode API fallback:", err.message);
-      if (err.message && !err.message.includes("fetch") && !err.message.includes("Network")) {
-        throw err;
-      }
-      return {
-        success: true,
-        destination: identifier,
-        phone: identifier,
-        message: `Reset code sent to ${identifier}.`,
-        demoCode: "123456",
-        otp: "123456",
-        expiresIn: 300,
-      };
+      console.warn("sendResetCode API error:", err.message);
+      throw err;
     }
   },
 
@@ -259,7 +245,7 @@ export const authService = {
 
       const data = await response.json();
       if (!response.ok || !data.success) {
-        throw new Error(data.message || "Invalid verification code.");
+        throw new Error(data.message || data.error || "Invalid verification code.");
       }
 
       return {
@@ -267,13 +253,7 @@ export const authService = {
         message: data.message || "Code verified successfully.",
       };
     } catch (err) {
-      console.warn("verifyOtp API fallback:", err.message);
-      if (trimmedCode === "123456") {
-        return {
-          success: true,
-          message: "Code verified successfully.",
-        };
-      }
+      console.warn("verifyOtp API error:", err.message);
       throw err;
     }
   },
@@ -287,8 +267,8 @@ export const authService = {
   resetPassword: async (id, newPassword, otp) => {
     const identifier = (id || "").trim();
 
-    if (!newPassword || newPassword.length < 6) {
-      throw new Error("New password must be at least 6 characters long.");
+    if (!newPassword || newPassword.length < 10) {
+      throw new Error("New password must be at least 10 characters long.");
     }
 
     try {
@@ -306,7 +286,7 @@ export const authService = {
 
       const data = await response.json();
       if (!response.ok || !data.success) {
-        throw new Error(data.message || "Failed to reset password.");
+        throw new Error(data.message || data.error || "Failed to reset password.");
       }
 
       return {
@@ -315,14 +295,8 @@ export const authService = {
         user: data.user,
       };
     } catch (err) {
-      console.warn("resetPassword API fallback:", err.message);
-      if (err.message && !err.message.includes("fetch") && !err.message.includes("Network")) {
-        throw err;
-      }
-      return {
-        success: true,
-        message: "Password updated successfully.",
-      };
+      console.warn("resetPassword API error:", err.message);
+      throw err;
     }
   },
 
