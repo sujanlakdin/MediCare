@@ -26,10 +26,10 @@ export default function AppTabs() {
   );
 }
 
-function TabBtn({ label, isFocused, ...props }: TabTriggerSlotProps & { label: string }) {
+function TabBtn({ label, isFocused, onPress }: TabTriggerSlotProps & { label: string }) {
   return (
     <Pressable
-      {...props}
+      onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
       style={[styles.tab, isFocused && styles.tabActive]}>
