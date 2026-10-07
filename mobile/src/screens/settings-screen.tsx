@@ -12,6 +12,7 @@ import { CareIcon, type CareIconName } from '@/components/care-icon';
 import { LogoutButton } from '@/components/logout-button';
 import { Screen } from '@/components/screen';
 import { useAccessibility } from '@/contexts/accessibility-context';
+import { useAuth } from '@/contexts/auth-context';
 
 type SettingsItem = {
   id: string;
@@ -22,6 +23,7 @@ type SettingsItem = {
 
 export default function SettingsScreen() {
   const { settings } = useAccessibility();
+  const { switchRole } = useAuth();
   const [privacyVisible, setPrivacyVisible] = useState(false);
 
   const items: SettingsItem[] = [

@@ -55,6 +55,11 @@ const UserSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
+    role: {
+      type: String,
+      enum: ["patient", "caregiver"],
+      default: "patient",
+    },
     phone: {
       type: String,
       required: [true, "Phone number is required"],

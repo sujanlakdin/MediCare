@@ -82,9 +82,11 @@ mongoose
 // API Routes
 const profileRoutes = require("./routes/profileRoutes");
 const medicationRoutes = require("./routes/medicationRoutes");
+const patientRoutes = require("./routes/patientRoutes");
 
 app.use("/api/profile", authenticate, profileRoutes);
 app.use("/api/medications", authenticate, medicationRoutes);
+app.use("/api/patients", patientRoutes);
 
 app.get("/", (req, res) => {
   res.json({

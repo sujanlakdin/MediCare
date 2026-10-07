@@ -89,3 +89,169 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
   return payload as T;
 }
+
+export interface MedicationItem {
+  _id?: string;
+  id?: string;
+  name: string;
+  dosage: string;
+  frequency?: string;
+  scheduledTime: string;
+  instructions?: string;
+  purpose?: string;
+  form?: string;
+  meal?: string;
+  stock?: number;
+  status?: 'taken' | 'missed' | 'upcoming';
+  adherencePercent?: number;
+}
+
+export interface PatientItem {
+  _id: string;
+  name: string;
+  age: number;
+  role: string;
+  statusBadgeText: string;
+  phone: string;
+  vitals: {
+    bloodPressure: string;
+    heartRate: number;
+    bloodSugar: number;
+  };
+}
+
+export const DEFAULT_PATIENTS: PatientItem[] = [
+  {
+    _id: '650000000000000000000001',
+    name: 'Eleanor Johnson',
+    age: 68,
+    role: 'Patient',
+    statusBadgeText: 'MONITORING ACTIVE',
+    phone: '+1 (555) 019-2831',
+    vitals: {
+      bloodPressure: '128/82',
+      heartRate: 72,
+      bloodSugar: 145,
+    },
+  },
+  {
+    _id: '650000000000000000000002',
+    name: 'Robert Chen',
+    age: 74,
+    role: 'Patient',
+    statusBadgeText: 'MONITORING ACTIVE',
+    phone: '+1 (555) 019-4412',
+    vitals: {
+      bloodPressure: '135/88',
+      heartRate: 78,
+      bloodSugar: 110,
+    },
+  },
+  {
+    _id: '650000000000000000000003',
+    name: 'Maria Garcia',
+    age: 62,
+    role: 'Patient',
+    statusBadgeText: 'ATTENTION NEEDED',
+    phone: '+1 (555) 019-8890',
+    vitals: {
+      bloodPressure: '142/92',
+      heartRate: 84,
+      bloodSugar: 168,
+    },
+  },
+];
+
+export const medicationApi = {
+  getMedications: async (patientId?: string): Promise<MedicationItem[]> => {
+    try {
+      const url = patientId
+        ? `${API_BASE_URL}/api/medications?patientId=${patientId}`
+        : `${API_BASE_URL}/api/medications`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      const resData = await res.json();
+      const list = Array.isArray(resData) ? resData : Array.isArray(resData?.data) ? resData.data : [];
+      return list;
+    } catch (error) {
+      return [];
+    }
+  },
+
+  addMedication: async (payload: {
+    name: string;
+    dosage: string;
+    frequency?: string;
+    scheduledTime: string;
+    instructions?: string;
+    purpose?: string;
+    form?: string;
+    meal?: string;
+    stock?: number;
+  }): Promise<MedicationItem> => {
+    const res = await fetch(`${API_BASE_URL}/api/medications`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const resData = await res.json();
+    if (!res.ok) throw new Error(resData.message || 'Failed to add medication');
+    return resData.data || resData;
+  },
+
+  updateMedication: async (
+    id: string,
+    payload: {
+      name?: string;
+      dosage?: string;
+      frequency?: string;
+      scheduledTime?: string;
+      instructions?: string;
+      purpose?: string;
+      form?: string;
+      meal?: string;
+      stock?: number;
+    }
+  ): Promise<MedicationItem> => {
+    const res = await fetch(`${API_BASE_URL}/api/medications/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const resData = await res.json();
+    if (!res.ok) throw new Error(resData.message || 'Failed to update medication');
+    return resData.data || resData;
+  },
+
+  updateStatus: async (id: string, status: 'taken' | 'missed' | 'upcoming') => {
+    const res = await fetch(`${API_BASE_URL}/api/medications/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    return await res.json();
+  },
+
+  deleteMedication: async (id: string): Promise<void> => {
+    const res = await fetch(`${API_BASE_URL}/api/medications/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || 'Failed to delete medication');
+    }
+  },
+};
+
+export const patientApi = {
+  getPatients: async (): Promise<PatientItem[]> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/patients`);
+      if (!res.ok) return DEFAULT_PATIENTS;
+      const data = await res.json();
+      return Array.isArray(data) && data.length > 0 ? data : DEFAULT_PATIENTS;
+    } catch (error) {
+      return DEFAULT_PATIENTS;
+    }
+  },
+};

@@ -24,7 +24,7 @@ export function Screen({
   onBack,
   rightAction,
   activeTab = 'profile',
-  hideBottomNav = false,
+  hideBottomNav = true,
   children,
 }: ScreenProps) {
   const { settings } = useAccessibility();

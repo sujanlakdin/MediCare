@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const Patient = require("../models/Patient");
 const crypto = require("crypto");
 
 /**
@@ -23,6 +24,7 @@ exports.register = async (req, res) => {
       residentialAddress,
       medicalId,
       accessibilitySettings,
+      role,
     } = req.body;
 
     // Validate required fields
@@ -70,9 +72,31 @@ exports.register = async (req, res) => {
       residentialAddress: residentialAddress || "No. 45, Temple Road, Colombo 03",
       medicalId: medicalId || "MED-72491",
       accessibilitySettings: defaultAccessibility,
+      role: role || "patient",
     });
 
     await newUser.save();
+
+    if (newUser.role === "patient") {
+      try {
+        await Patient.create({
+          _id: newUser._id,
+          name: newUser.fullName,
+          age: newUser.age || 65,
+          role: "Patient",
+          statusBadgeText: "MONITORING ACTIVE",
+          phone: newUser.phone || "+94 77 123 4567",
+          vitals: {
+            bloodPressure: "120/80",
+            heartRate: 72,
+            bloodSugar: 110,
+            lastUpdated: new Date(),
+          },
+        });
+      } catch (pErr) {
+        console.log("Patient record sync warning:", pErr.message);
+      }
+    }
 
     const token = generateToken();
 

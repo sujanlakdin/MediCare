@@ -52,6 +52,7 @@ function RootNavigator() {
       <Stack.Protected guard={Boolean(token)}>
         <Stack.Screen name="(app)" />
         <Stack.Screen name="(patient)" />
+        <Stack.Screen name="(caregiver)" />
       </Stack.Protected>
     </Stack>
   );
