@@ -1,6 +1,28 @@
 const dns = require("dns");
-dns.setServers(["8.8.8.8", "1.1.1.1"]);
-if (dns.setDefaultResultOrder) dns.setDefaultResultOrder("ipv4first");
+try {
+  dns.setServers(["8.8.8.8", "1.1.1.1"]);
+  if (dns.setDefaultResultOrder) dns.setDefaultResultOrder("ipv4first");
+} catch {}
+
+const origLookup = dns.lookup;
+dns.lookup = (hostname, options, callback) => {
+  if (typeof options === "function") {
+    callback = options;
+    options = {};
+  }
+  origLookup(hostname, options, (err, address, family) => {
+    if (err && hostname && hostname.includes("mongodb.net")) {
+      dns.resolve4(hostname, (resErr, addresses) => {
+        if (!resErr && addresses?.length) {
+          return callback(null, addresses[0], 4);
+        }
+        callback(err, address, family);
+      });
+    } else {
+      callback(err, address, family);
+    }
+  });
+};
 
 const express = require("express");
 const cors = require("cors");
@@ -8,12 +30,6 @@ const mongoose = require("mongoose");
 const path = require("path");
 require("dotenv").config();
 
-// Ensure reliable DNS SRV resolution for MongoDB Atlas on Windows networks
-try {
-  dns.setServers(["8.8.8.8", "1.1.1.1"]);
-} catch {
-  // Use default system resolvers if unavailable
-}
 const authRoutes = require("./src/routes/auth");
 const userRoutes = require("./src/routes/users");
 const caregiverRoutes = require("./src/routes/caregivers");

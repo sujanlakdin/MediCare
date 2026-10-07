@@ -64,15 +64,19 @@ export async function uploadProfilePhoto(token: string, uri: string, fileName?: 
     const blob = await res.blob();
     formData.append('photo', blob, safeFileName);
   } else {
+    const normalizedUri = Platform.OS === 'android' && !uri.startsWith('file://') && !uri.startsWith('content://')
+      ? `file://${uri}`
+      : uri;
+
     formData.append('photo', {
-      uri,
+      uri: normalizedUri,
       name: safeFileName,
       type: mimeType,
     } as unknown as Blob);
   }
 
   return apiRequest<{ success: boolean; message: string; profilePhoto: string }>('/api/users/profile-photo', {
-    method: 'PUT', token, body: formData, isFormData: true,
+    method: 'POST', token, body: formData, isFormData: true,
   });
 }
 

@@ -88,7 +88,7 @@ function pickSettings(input, booleanKeys, extraKeys = []) {
   return settings;
 }
 
-router.put("/profile-photo", upload.single("photo"), async (req, res) => {
+const handleProfilePhotoUpload = async (req, res) => {
   const file = req.file;
   if (!file) {
     const error = new Error("Please select a valid image.");
@@ -117,7 +117,10 @@ router.put("/profile-photo", upload.single("photo"), async (req, res) => {
     message: "Profile photo updated successfully",
     profilePhoto: updatedUser.profilePhotoUrl || "",
   });
-});
+};
+
+router.put("/profile-photo", upload.single("photo"), handleProfilePhotoUpload);
+router.post("/profile-photo", upload.single("photo"), handleProfilePhotoUpload);
 
 router.delete("/profile-photo", async (req, res) => {
   const user = await User.findById(req.userId).select("profilePhotoUrl").lean();
