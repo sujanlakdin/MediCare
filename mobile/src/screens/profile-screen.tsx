@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
 import { launchCameraAsync, launchImageLibraryAsync, requestCameraPermissionsAsync, requestMediaLibraryPermissionsAsync, type ImagePickerAsset } from 'expo-image-picker';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { CareIcon } from '@/components/care-icon';
 import { LogoutButton } from '@/components/logout-button';
@@ -137,7 +137,19 @@ export default function ProfileScreen() {
 
     try {
       const response = await uploadProfilePhoto(token, previewImage.uri, previewImage.name);
-      setProfile((current) => (current ? { ...current, profilePhotoUrl: response.profilePhoto } : current));
+      setProfile((current) => ({
+        ...(current || {
+          _id: '',
+          fullName: displayName,
+          email: displayEmail,
+          phone: displayPhone,
+          dateOfBirth: '',
+          gender: '',
+          address: displayAddress,
+          emergencyContact: { name: '', relationship: '', phone: '', email: '' },
+        }),
+        profilePhotoUrl: response.profilePhoto,
+      }));
       setImageLoadError(false);
       setPhotoVersion(Date.now());
       setPreviewMode(null);
@@ -159,24 +171,35 @@ export default function ProfileScreen() {
       return;
     }
 
-    Alert.alert('Remove Profile Photo?', 'Are you sure you want to remove your profile photo?', [
+    const executeRemoval = async () => {
+      try {
+        const response = await removeProfilePhoto(token);
+        setProfile((current) => (current ? { ...current, profilePhotoUrl: '' } : current));
+        setImageLoadError(false);
+        setPhotoVersion(Date.now());
+        Alert.alert('Profile Photo', response.message || 'Profile photo removed successfully.');
+      } catch (requestError) {
+        Alert.alert(
+          'Profile Photo',
+          requestError instanceof ApiError ? requestError.message : 'Unable to remove your profile photo. Please try again.'
+        );
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm('Are you sure you want to remove your profile picture?')) {
+        await executeRemoval();
+      }
+      return;
+    }
+
+    Alert.alert('Remove Profile Picture', 'Are you sure you want to remove your profile picture?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Remove',
+        text: 'Delete',
         style: 'destructive',
-        onPress: async () => {
-          try {
-            const response = await removeProfilePhoto(token);
-            setProfile((current) => (current ? { ...current, profilePhotoUrl: '' } : current));
-            setImageLoadError(false);
-            setPhotoVersion(Date.now());
-            Alert.alert('Profile Photo', response.message || 'Profile photo removed successfully.');
-          } catch (requestError) {
-            Alert.alert(
-              'Profile Photo',
-              requestError instanceof ApiError ? requestError.message : 'Unable to remove your profile photo. Please try again.'
-            );
-          }
+        onPress: () => {
+          void executeRemoval();
         },
       },
     ]);
@@ -233,10 +256,6 @@ export default function ProfileScreen() {
     ? `MRX-${profile._id.slice(-4).toUpperCase()}-72`
     : DEFAULT_PROFILE.medicalId;
 
-  const avatarSource = profile?.profilePhotoUrl && !imageLoadError
-    ? { uri: `${profile.profilePhotoUrl}${profile.profilePhotoUrl.includes('?') ? '&' : '?'}v=${photoVersion}` }
-    : require('@/assets/images/chathura_avatar.jpg');
-
   return (
     <Screen
       title="My Profile"
@@ -252,13 +271,21 @@ export default function ProfileScreen() {
           {/* Profile Header Block */}
           <View style={styles.identityBlock}>
             <View style={styles.avatarWrapper}>
-              <Image
-                source={avatarSource}
-                style={styles.avatarImage}
-                accessibilityLabel={`Profile image for ${displayName}`}
-                onError={() => setImageLoadError(true)}
-                onLoad={() => setImageLoadError(false)}
-              />
+              {hasProfilePhoto && !imageLoadError ? (
+                <Image
+                  source={{
+                    uri: `${profile!.profilePhotoUrl}${profile!.profilePhotoUrl!.includes('?') ? '&' : '?'}v=${photoVersion}`,
+                  }}
+                  style={styles.avatarImage}
+                  accessibilityLabel={`Profile image for ${displayName}`}
+                  onError={() => setImageLoadError(true)}
+                  onLoad={() => setImageLoadError(false)}
+                />
+              ) : (
+                <View style={styles.blankAvatar}>
+                  <Ionicons name="person" size={44} color="#71827A" />
+                </View>
+              )}
             </View>
             <Pressable
               accessibilityRole="button"
@@ -423,7 +450,7 @@ export default function ProfileScreen() {
                   <Text style={styles.optionText}>View Photo</Text>
                 </Pressable>
                 <Pressable style={styles.optionButton} onPress={() => { setPhotoMenuVisible(false); void handleRemovePhoto(); }}>
-                  <Text style={[styles.optionText, styles.destructiveText]}>Remove Photo</Text>
+                  <Text style={[styles.optionText, styles.destructiveText]}>Remove Profile Picture</Text>
                 </Pressable>
               </>
             )}
@@ -459,9 +486,19 @@ export default function ProfileScreen() {
           <View style={styles.viewerCard}>
             <View style={styles.viewerHeader}>
               <Text style={styles.viewerTitle}>Profile Photo</Text>
-              <Pressable onPress={() => setPhotoViewerVisible(false)} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>Close</Text>
-              </Pressable>
+              <View style={styles.viewerHeaderActions}>
+                <Pressable
+                  onPress={() => {
+                    setPhotoViewerVisible(false);
+                    void handleRemovePhoto();
+                  }}
+                  style={styles.closeButton}>
+                  <Text style={[styles.closeButtonText, styles.destructiveText]}>Delete</Text>
+                </Pressable>
+                <Pressable onPress={() => setPhotoViewerVisible(false)} style={styles.closeButton}>
+                  <Text style={styles.closeButtonText}>Close</Text>
+                </Pressable>
+              </View>
             </View>
             {profile?.profilePhotoUrl ? (
               <Image
@@ -508,6 +545,15 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 6,
+    backgroundColor: '#E8F6EF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  blankAvatar: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#E8F6EF',
   },
   avatarImage: {
@@ -815,6 +861,11 @@ const styles = StyleSheet.create({
     color: '#0E3E2F',
     fontSize: 17,
     fontWeight: '700',
+  },
+  viewerHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   closeButton: {
     paddingHorizontal: 10,

@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import { apiRequest } from '@/services/api';
 
 export type EmergencyContact = {
@@ -51,17 +53,23 @@ export function updateProfile(token: string, changes: ProfileChanges) {
   });
 }
 
-export function uploadProfilePhoto(token: string, uri: string, fileName?: string) {
+export async function uploadProfilePhoto(token: string, uri: string, fileName?: string) {
   const safeFileName = fileName || uri.split('/').pop() || 'profile-photo.jpg';
   const extension = safeFileName.split('.').pop()?.toLowerCase() || 'jpg';
   const mimeType = extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : 'image/jpeg';
   const formData = new FormData();
 
-  formData.append('photo', {
-    uri,
-    name: safeFileName,
-    type: mimeType,
-  } as unknown as Blob);
+  if (Platform.OS === 'web') {
+    const res = await fetch(uri);
+    const blob = await res.blob();
+    formData.append('photo', blob, safeFileName);
+  } else {
+    formData.append('photo', {
+      uri,
+      name: safeFileName,
+      type: mimeType,
+    } as unknown as Blob);
+  }
 
   return apiRequest<{ success: boolean; message: string; profilePhoto: string }>('/api/users/profile-photo', {
     method: 'PUT', token, body: formData, isFormData: true,
