@@ -12,6 +12,7 @@ const app = express();
 const authRoutes = require("./routes/authRoutes");
 const patientRoutes = require("./routes/patientRoutes");
 const medicationRoutes = require("./routes/medicationRoutes");
+const profileRoutes = require("./routes/profileRoutes");
 
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
@@ -31,11 +32,8 @@ mongoose
   });
 
 // API Routes
-const authRoutes = require("./routes/authRoutes");
-const profileRoutes = require("./routes/profileRoutes");
-const medicationRoutes = require("./routes/medicationRoutes");
-
 app.use("/api/auth", authRoutes);
+app.use("/api/patients", patientRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/medications", medicationRoutes);
 

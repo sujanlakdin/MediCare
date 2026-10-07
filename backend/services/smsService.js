@@ -1,4 +1,9 @@
-const twilio = require("twilio");
+let twilio;
+try {
+  twilio = require("twilio");
+} catch (err) {
+  console.warn("[Twilio SMS] twilio module not loaded:", err.message);
+}
 
 /**
  * Normalizes phone numbers to standard E.164 format required by Twilio.
