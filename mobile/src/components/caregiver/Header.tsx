@@ -5,6 +5,7 @@ import { Colors } from '@/constants/theme';
 
 interface CaregiverHeaderProps {
   caregiverName?: string;
+  avatarUrl?: string;
   subtext?: string;
   notificationCount?: number;
   onNotificationPress?: () => void;
@@ -12,16 +13,25 @@ interface CaregiverHeaderProps {
 }
 
 export function CaregiverHeader({
-  caregiverName = 'Sarah',
+  caregiverName = 'Kasun',
+  avatarUrl = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
   subtext = "Here's Eleanor's medication update",
   notificationCount = 1,
   onNotificationPress,
   onProfilePress,
 }: CaregiverHeaderProps) {
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return 'Good morning';
+    if (hour >= 12 && hour < 17) return 'Good afternoon';
+    if (hour >= 17 && hour < 22) return 'Good evening';
+    return 'Good night';
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.textContainer}>
-        <Text style={styles.greeting}>Good morning, {caregiverName}</Text>
+        <Text style={styles.greeting}>{getGreeting()}, {caregiverName}</Text>
         <Text style={styles.subtext}>{subtext}</Text>
       </View>
       <View style={styles.actionsContainer}>
@@ -36,7 +46,7 @@ export function CaregiverHeader({
         <Pressable style={styles.avatarButton} onPress={onProfilePress}>
           <Image
             source={{
-              uri: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80',
+              uri: avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
             }}
             style={styles.avatar}
           />

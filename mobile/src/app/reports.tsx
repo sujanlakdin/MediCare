@@ -8,10 +8,37 @@ import { CircularGauge } from '@/components/caregiver/CircularGauge';
 import { WeeklyChart } from '@/components/caregiver/WeeklyChart';
 import { HealthScoreCard } from '@/components/caregiver/HealthScoreCard';
 import { Colors, MaxContentWidth } from '@/constants/theme';
+import { downloadReport } from '@/services/reportGenerator';
 
 export default function ReportsScreen() {
   const router = useRouter();
   const [reportTab, setReportTab] = useState<'adherence' | 'progress'>('adherence');
+
+  const handleDownloadReport = () => {
+    downloadReport({
+      patientName: 'Eleanor Johnson',
+      patientAge: 68,
+      patientRole: 'Patient',
+      statusBadgeText: 'MONITORING ACTIVE',
+      overallAdherence: 85,
+      ratingText: 'Excellent rating',
+      weeklyData: [
+        { day: 'Mon', percent: 90 },
+        { day: 'Tue', percent: 100 },
+        { day: 'Wed', percent: 75 },
+        { day: 'Thu', percent: 85 },
+        { day: 'Fri', percent: 90 },
+        { day: 'Sat', percent: 50 },
+        { day: 'Sun', percent: 95 },
+      ],
+      medications: [
+        { name: 'Lisinopril 10mg', percent: 95 },
+        { name: 'Atorvastatin 20mg', percent: 90 },
+        { name: 'Metformin 500mg', percent: 75 },
+        { name: 'Amlodipine 5mg', percent: 88 },
+      ],
+    });
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -142,7 +169,7 @@ export default function ReportsScreen() {
 
               <Pressable
                 style={styles.downloadBtn}
-                onPress={() => alert('Report download initiated!')}>
+                onPress={handleDownloadReport}>
                 <Text style={styles.downloadBtnText}>Download Report</Text>
               </Pressable>
             </>

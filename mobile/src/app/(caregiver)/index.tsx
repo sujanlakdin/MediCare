@@ -12,11 +12,13 @@ import { ScheduleList, ScheduleItem } from '@/components/caregiver/ScheduleList'
 import { Colors, MaxContentWidth } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { patientApi, medicationApi, PatientItem, MedicationItem } from '@/services/api';
+import { caregiverProfileStore } from '@/services/caregiverProfileStore';
 
 export default function DashboardScreen() {
   const router = useRouter();
   const { user } = useAuth();
 
+  const [caregiverProfile, setCaregiverProfile] = useState(caregiverProfileStore.getProfile());
   const [patients, setPatients] = useState<PatientItem[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<PatientItem | null>(null);
   const [medications, setMedications] = useState<MedicationItem[]>([]);
@@ -24,32 +26,23 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     loadInitialData();
+    const unsubscribe = caregiverProfileStore.subscribe((updated) => {
+      setCaregiverProfile(updated);
+    });
+    return () => unsubscribe();
   }, [user]);
 
   const loadInitialData = async () => {
     try {
       setLoading(true);
-      const patientList = await patientApi.getPatients();
+      let patientList = await patientApi.getPatients();
 
-      // If user is logged in, ensure user is present in patient list
-      if (user && user.fullName) {
-        const exists = patientList.some((p) => p._id === user.id || p.name.toLowerCase() === user.fullName.toLowerCase());
-        if (!exists) {
-          patientList.unshift({
-            _id: user.id || 'user-' + Date.now(),
-            name: user.fullName,
-            age: 65,
-            role: user.role === 'caregiver' ? 'Caregiver' : 'Patient',
-            statusBadgeText: 'MONITORING ACTIVE',
-            phone: '+94 77 123 4567',
-            vitals: {
-              bloodPressure: '120/80',
-              heartRate: 72,
-              bloodSugar: 110,
-            },
-          });
-        }
-      }
+      // Ensure caregivers are excluded from the patient selection list
+      patientList = patientList.filter((p) => {
+        const isCaregiverRole = p.role && p.role.toLowerCase() === 'caregiver';
+        const isCurrentUserCaregiver = user && user.role === 'caregiver' && user.fullName && p.name.toLowerCase() === user.fullName.toLowerCase();
+        return !isCaregiverRole && !isCurrentUserCaregiver;
+      });
 
       setPatients(patientList);
       if (patientList.length > 0) {
@@ -93,34 +86,46 @@ export default function DashboardScreen() {
     [completedDoses, totalDoses]
   );
 
-  // Convert medications to ScheduleList items
+  // Convert medications to ScheduleList items (supporting multi-dose times e.g. 08:00 AM, 04:00 PM, 12:00 AM)
   const scheduleItems: ScheduleItem[] = useMemo(() => {
     if (!medications || medications.length === 0) return [];
-    return medications.map((med) => {
-      let period: 'MORNING' | 'AFTERNOON' | 'EVENING' | 'NIGHT' = 'MORNING';
-      const timeUpper = (med.scheduledTime || '').toUpperCase();
-      if (timeUpper.includes('PM')) {
-        if (timeUpper.includes('12:') || timeUpper.includes('1:') || timeUpper.includes('2:') || timeUpper.includes('3:') || timeUpper.includes('4:')) {
-          period = 'AFTERNOON';
-        } else if (timeUpper.includes('5:') || timeUpper.includes('6:') || timeUpper.includes('7:') || timeUpper.includes('8:')) {
-          period = 'EVENING';
-        } else {
-          period = 'NIGHT';
+    const items: ScheduleItem[] = [];
+
+    medications.forEach((med) => {
+      const times = (med.scheduledTime || '08:00 AM').split(',').map((t) => t.trim());
+      times.forEach((singleTime, idx) => {
+        let period: 'MORNING' | 'AFTERNOON' | 'EVENING' | 'NIGHT' = 'MORNING';
+        const timeUpper = singleTime.toUpperCase();
+
+        if (timeUpper.includes('PM')) {
+          if (timeUpper.includes('12:') || timeUpper.includes('1:') || timeUpper.includes('2:') || timeUpper.includes('3:') || timeUpper.includes('4:')) {
+            period = 'AFTERNOON';
+          } else if (timeUpper.includes('5:') || timeUpper.includes('6:') || timeUpper.includes('7:') || timeUpper.includes('8:')) {
+            period = 'EVENING';
+          } else {
+            period = 'NIGHT';
+          }
+        } else if (timeUpper.includes('AM')) {
+          if (timeUpper.includes('12:')) {
+            period = 'NIGHT';
+          }
         }
-      }
 
-      let status: 'Completed' | 'Missed' | 'Scheduled' = 'Scheduled';
-      if (med.status === 'taken') status = 'Completed';
-      else if (med.status === 'missed') status = 'Missed';
+        let status: 'Completed' | 'Missed' | 'Scheduled' = 'Scheduled';
+        if (med.status === 'taken') status = 'Completed';
+        else if (med.status === 'missed') status = 'Missed';
 
-      return {
-        id: med._id || String(Math.random()),
-        period,
-        medications: `${med.name} ${med.dosage}`,
-        status,
-        scheduledTime: med.scheduledTime,
-      };
+        items.push({
+          id: `${med._id || String(Math.random())}-${idx}`,
+          period,
+          medications: `${med.name} ${med.dosage || ''}`.trim(),
+          status,
+          scheduledTime: singleTime,
+        });
+      });
     });
+
+    return items;
   }, [medications]);
 
   const firstName = selectedPatient?.name ? selectedPatient.name.split(' ')[0] : 'Patient';
@@ -133,7 +138,8 @@ export default function DashboardScreen() {
         <View style={styles.wrapper}>
           {/* Top Header */}
           <CaregiverHeader
-            caregiverName={user?.fullName ? user.fullName.split(' ')[0] : 'Sarah'}
+            caregiverName={caregiverProfile.name ? caregiverProfile.name.split(' ')[0] : 'Kasun'}
+            avatarUrl={caregiverProfile.avatarUrl}
             subtext={`Here's ${firstName}'s medication update`}
             notificationCount={missedCount}
             onNotificationPress={() => router.push('/(caregiver)/alerts')}
@@ -180,7 +186,7 @@ export default function DashboardScreen() {
           )}
 
           {/* Today's Schedule */}
-          <ScheduleList items={scheduleItems.length > 0 ? scheduleItems : undefined} />
+          <ScheduleList items={scheduleItems} />
         </View>
       </ScrollView>
     </SafeAreaView>

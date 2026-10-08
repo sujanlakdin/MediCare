@@ -85,12 +85,14 @@ const medicationRoutes = require("./routes/medicationRoutes");
 const patientRoutes = require("./routes/patientRoutes");
 const reminderRoutes = require("./routes/reminderRoutes");
 const doseLogRoutes = require("./routes/doseLogRoutes");
+const noteRoutes = require("./routes/noteRoutes");
 
 app.use("/api/profile", authenticate, profileRoutes);
 app.use("/api/medications", authenticate, medicationRoutes);
 app.use("/api/patients", patientRoutes);
 app.use("/api/reminders", authenticate, reminderRoutes);
 app.use("/api/dose-logs", authenticate, doseLogRoutes);
+app.use("/api/notes", noteRoutes);
 
 app.get("/", (req, res) => {
   res.json({

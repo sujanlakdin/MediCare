@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScrollView, StyleSheet, View, Text, Image, Switch, Pressable, TouchableOpacity, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, MaxContentWidth } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'expo-router';
+import { patientApi, PatientItem } from '@/services/api';
+import { downloadReport } from '@/services/reportGenerator';
+import { EmergencyModal } from '@/components/caregiver/EmergencyModal';
+import { ProfileEditModal, CaregiverProfileData } from '@/components/caregiver/ProfileEditModal';
+import { caregiverProfileStore } from '@/services/caregiverProfileStore';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -14,10 +19,85 @@ export default function ProfileScreen() {
   const [refillReminders, setRefillReminders] = useState(true);
   const [dailySummary, setDailySummary] = useState(true);
   const [appointmentReminders, setAppointmentReminders] = useState(false);
+  const [patients, setPatients] = useState<PatientItem[]>([]);
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+  const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
+  const [emergencyModalVisible, setEmergencyModalVisible] = useState<boolean>(false);
+  const [editProfileModalVisible, setEditProfileModalVisible] = useState<boolean>(false);
 
-  const handleSwitchToPatient = async () => {
-    await switchRole('patient');
-    router.replace('/(app)/(tabs)' as any);
+  const [caregiverProfile, setCaregiverProfile] = useState<CaregiverProfileData>(
+    caregiverProfileStore.getProfile()
+  );
+
+  useEffect(() => {
+    loadPatients();
+    const unsubscribe = caregiverProfileStore.subscribe((updated) => {
+      setCaregiverProfile(updated);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const loadPatients = async () => {
+    try {
+      const list = await patientApi.getPatients();
+      const valid = list.filter((p) => !(p.role && p.role.toLowerCase() === 'caregiver'));
+      setPatients(valid);
+      if (valid.length > 0) {
+        setSelectedPatientId(valid[0]._id);
+      }
+    } catch (err) {
+      console.error('Failed to load linked patients in profile:', err);
+    }
+  };
+
+  const activePatient = patients.find((p) => p._id === selectedPatientId) || patients[0] || {
+    _id: 'default',
+    name: 'Eleanor Johnson',
+    age: 68,
+  };
+
+  const handleSelectPatient = (patient: PatientItem) => {
+    setSelectedPatientId(patient._id);
+    setDropdownOpen(false);
+    Alert.alert(
+      'Active Patient Selected 👤',
+      `${patient.name} is now selected as your active patient.`
+    );
+  };
+
+  const handleExportReport = () => {
+    const mainPatient = patients.length > 0 ? patients[0].name : 'Eleanor Johnson';
+    downloadReport({
+      patientName: mainPatient,
+      patientAge: 68,
+      patientRole: 'Patient',
+      statusBadgeText: 'MONITORING ACTIVE',
+      overallAdherence: 88,
+      ratingText: 'Excellent rating',
+      weeklyData: [
+        { day: 'Mon', percent: 90 },
+        { day: 'Tue', percent: 100 },
+        { day: 'Wed', percent: 75 },
+        { day: 'Thu', percent: 85 },
+        { day: 'Fri', percent: 90 },
+        { day: 'Sat', percent: 50 },
+        { day: 'Sun', percent: 95 },
+      ],
+      medications: [
+        { name: 'Lisinopril 10mg', percent: 95 },
+        { name: 'Atorvastatin 20mg', percent: 90 },
+        { name: 'Metformin 500mg', percent: 75 },
+      ],
+    });
+
+    Alert.alert(
+      'Caregiver Report Exported! 📄',
+      `Comprehensive monitoring PDF summary for ${mainPatient} has been downloaded.`
+    );
+  };
+
+  const handleShowEmergencyInfo = () => {
+    setEmergencyModalVisible(true);
   };
 
   const handleLogout = async () => {
@@ -41,39 +121,98 @@ export default function ProfileScreen() {
 
           {/* Profile Card */}
           <View style={styles.profileCard}>
-            <Image
-              source={{
-                uri: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80',
-              }}
-              style={styles.avatar}
-            />
-            <View style={styles.profileTextCol}>
-              <Text style={styles.caregiverName}>{user?.fullName || 'Sarah Mitchell'}</Text>
-              <Text style={styles.roleTitle}>
-                {user?.role === 'patient' ? 'Patient' : 'Primary Caregiver'}
-              </Text>
-              <Text style={styles.emailText}>{user?.email || 'sarah.mitchell@email.com'}</Text>
-            </View>
-          </View>
-
-          {/* Linked Patients */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionHeader}>Linked Patients</Text>
-            <View style={styles.patientCard}>
+            <View style={{ position: 'relative' }}>
               <Image
                 source={{
-                  uri: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
+                  uri: caregiverProfile.avatarUrl,
+                }}
+                style={styles.avatar}
+              />
+              <Pressable
+                style={styles.avatarEditBadge}
+                onPress={() => setEditProfileModalVisible(true)}>
+                <Ionicons name="camera" size={12} color="#FFFFFF" />
+              </Pressable>
+            </View>
+            <View style={styles.profileTextCol}>
+              <Text style={styles.caregiverName}>{caregiverProfile.name}</Text>
+              <Text style={styles.roleTitle}>{caregiverProfile.role} • {caregiverProfile.age} yrs</Text>
+              <Text style={styles.emailText}>{caregiverProfile.email}</Text>
+            </View>
+            <Pressable
+              style={styles.editProfileBtn}
+              onPress={() => setEditProfileModalVisible(true)}>
+              <Ionicons name="create-outline" size={18} color={Colors.light.primary} />
+            </Pressable>
+          </View>
+
+          {/* Linked Patients Dropdown */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionHeader}>Linked Patients</Text>
+
+            {/* Dropdown Trigger Header */}
+            <Pressable
+              style={styles.dropdownHeaderCard}
+              onPress={() => setDropdownOpen(!dropdownOpen)}>
+              <Image
+                source={{
+                  uri: (activePatient as any).avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
                 }}
                 style={styles.patientAvatar}
               />
               <View style={styles.patientInfoCol}>
-                <Text style={styles.patientName}>Eleanor Johnson</Text>
-                <Text style={styles.patientSub}>Age 68 • Patient</Text>
+                <Text style={styles.patientName}>{activePatient.name}</Text>
+                <Text style={styles.patientSub}>Age {activePatient.age || 68} • Patient</Text>
               </View>
-              <View style={styles.activeBadge}>
-                <Text style={styles.activeBadgeText}>ACTIVE</Text>
+              <View style={styles.dropdownBadgeRow}>
+                <View style={styles.activeBadge}>
+                  <Text style={styles.activeBadgeText}>ACTIVE</Text>
+                </View>
+                <Ionicons
+                  name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
+                  size={20}
+                  color={Colors.light.primary}
+                />
               </View>
-            </View>
+            </Pressable>
+
+            {/* Expanded Dropdown List */}
+            {dropdownOpen && (
+              <View style={styles.dropdownListContainer}>
+                {patients.length > 0 ? (
+                  patients.map((patient) => {
+                    const isSelected = patient._id === selectedPatientId;
+                    return (
+                      <Pressable
+                        key={patient._id || patient.name}
+                        style={[
+                          styles.dropdownItemRow,
+                          isSelected && styles.dropdownItemActive,
+                        ]}
+                        onPress={() => handleSelectPatient(patient)}>
+                        <Image
+                          source={{
+                            uri: (patient as any).avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
+                          }}
+                          style={styles.patientAvatarSmall}
+                        />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.patientNameSmall}>{patient.name}</Text>
+                          <Text style={styles.patientSubSmall}>Age {patient.age || 68} • Patient</Text>
+                        </View>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={18} color={Colors.light.primary} />
+                        )}
+                      </Pressable>
+                    );
+                  })
+                ) : (
+                  <View style={styles.dropdownItemRow}>
+                    <Text style={styles.patientSubSmall}>No other linked patients found.</Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
 
           {/* Notification Preferences */}
@@ -125,24 +264,20 @@ export default function ProfileScreen() {
               <Pressable
                 style={styles.actionBtn}
                 onPress={() => {
-                  Linking.openURL('tel:+15550199999').catch(() =>
-                    Alert.alert('Contacting Doctor', 'Dialing Dr. Patel (+1 555-019-9999)...')
+                  Linking.openURL('tel:0701982984').catch(() =>
+                    Alert.alert('Contacting Doctor', 'Dialing Primary Doctor (070 198 2984)...')
                   );
                 }}>
                 <Ionicons name="call-outline" size={20} color={Colors.light.primary} />
                 <Text style={styles.actionBtnText}>Contact Doctor</Text>
               </Pressable>
 
-              <Pressable
-                style={styles.actionBtn}
-                onPress={() => alert('Emergency Information details...')}>
+              <Pressable style={styles.actionBtn} onPress={handleShowEmergencyInfo}>
                 <Ionicons name="information-circle-outline" size={20} color={Colors.light.primary} />
                 <Text style={styles.actionBtnText}>Emergency Info</Text>
               </Pressable>
 
-              <Pressable
-                style={styles.actionBtn}
-                onPress={() => alert('Exporting full Caregiver report PDF...')}>
+              <Pressable style={styles.actionBtn} onPress={handleExportReport}>
                 <Ionicons name="download-outline" size={20} color={Colors.light.primary} />
                 <Text style={styles.actionBtnText}>Export Reports</Text>
               </Pressable>
@@ -161,6 +296,37 @@ export default function ProfileScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Emergency Info Modal */}
+      <EmergencyModal
+        visible={emergencyModalVisible}
+        onClose={() => setEmergencyModalVisible(false)}
+        patientName={activePatient.name}
+      />
+
+      {/* Caregiver Profile Edit Modal */}
+      <ProfileEditModal
+        visible={editProfileModalVisible}
+        onClose={() => setEditProfileModalVisible(false)}
+        initialData={caregiverProfile}
+        onSave={(updatedData) => {
+          setCaregiverProfile(updatedData);
+          caregiverProfileStore.updateProfile(updatedData);
+        }}
+        onDelete={() => {
+          const defaultData = {
+            name: 'Kasun Perera',
+            age: '32',
+            role: 'Primary Caregiver',
+            email: 'kasun1234@gmail.com',
+            phone: '0701982984',
+            avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+          };
+          setCaregiverProfile(defaultData);
+          caregiverProfileStore.updateProfile(defaultData);
+          Alert.alert('Profile Reset! 🗑️', 'Caregiver profile details have been reset to default.');
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -172,7 +338,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 24,
+    paddingBottom: 100,
     alignItems: 'center',
   },
   wrapper: {
@@ -208,6 +374,25 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
   },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: Colors.light.primary,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  editProfileBtn: {
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: '#E6F4EA',
+    marginLeft: 'auto',
+  },
   profileTextCol: {
     flex: 1,
   },
@@ -235,6 +420,52 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.light.primary,
     marginBottom: 10,
+  },
+  dropdownHeaderCard: {
+    backgroundColor: Colors.light.cardBackground,
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+  },
+  dropdownBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dropdownListContainer: {
+    backgroundColor: Colors.light.cardBackground,
+    borderRadius: 14,
+    marginTop: 6,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+  },
+  dropdownItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 10,
+    gap: 10,
+  },
+  dropdownItemActive: {
+    backgroundColor: '#F1F9F6',
+  },
+  patientAvatarSmall: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
+  patientNameSmall: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.light.text,
+  },
+  patientSubSmall: {
+    fontSize: 11,
+    color: Colors.light.textSecondary,
   },
   patientCard: {
     backgroundColor: Colors.light.cardBackground,

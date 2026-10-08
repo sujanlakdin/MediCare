@@ -2,22 +2,47 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
+import { PatientCard } from './PatientCard';
+import { PatientItem } from '@/services/api';
 
 interface HealthScoreCardProps {
   score?: number;
   statusText?: string;
+  patientName?: string;
+  patientAge?: number;
+  patientsList?: PatientItem[];
+  selectedPatientId?: string;
+  onSelectPatient?: (patient: PatientItem) => void;
   onViewCompleteHistory?: () => void;
 }
 
 export function HealthScoreCard({
-  score = 78,
-  statusText = 'Good — Improving',
+  score = 88,
+  statusText = 'Excellent — Stable',
+  patientName = 'Eleanor Johnson',
+  patientAge = 68,
+  patientsList,
+  selectedPatientId,
+  onSelectPatient,
   onViewCompleteHistory,
 }: HealthScoreCardProps) {
   return (
     <View style={styles.container}>
+      {/* Patient Switcher if list is provided */}
+      {patientsList && patientsList.length > 0 && (
+        <PatientCard
+          patientName={patientName}
+          patientAge={patientAge}
+          patientRole="Patient"
+          statusBadgeText="MONITORING ACTIVE"
+          patientsList={patientsList}
+          selectedPatientId={selectedPatientId}
+          onSelectPatient={onSelectPatient}
+        />
+      )}
+
       <Text style={styles.sectionTitle}>Patient Progress</Text>
-      <Text style={styles.sectionSub}>Eleanor Johnson's Health Journey</Text>
+      <Text style={styles.sectionSub}>{patientName}'s Health Journey</Text>
 
       {/* Main Semi Circle Score Card */}
       <View style={styles.scoreCard}>
@@ -32,7 +57,7 @@ export function HealthScoreCard({
       <View style={styles.metricsGrid}>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>MEDICATION ADHERENCE</Text>
-          <Text style={styles.metricValue}>85%</Text>
+          <Text style={styles.metricValue}>92%</Text>
           <Text style={styles.metricSubGreen}>↑ Improving</Text>
         </View>
 
@@ -57,12 +82,12 @@ export function HealthScoreCard({
 
       {/* Milestones Card */}
       <View style={styles.sectionCard}>
-        <Text style={styles.cardHeaderTitle}>Milestones</Text>
+        <Text style={styles.cardHeaderTitle}>Milestones & Achievements</Text>
 
         <View style={styles.milestoneItem}>
           <View style={styles.greenDot} />
           <View>
-            <Text style={styles.milestoneTitle}>30 Days Streak</Text>
+            <Text style={styles.milestoneTitle}>30 Days Medication Streak</Text>
             <Text style={styles.milestoneDate}>Achieved Sept 5</Text>
           </View>
         </View>
@@ -70,7 +95,7 @@ export function HealthScoreCard({
         <View style={styles.milestoneItem}>
           <View style={styles.greenDot} />
           <View>
-            <Text style={styles.milestoneTitle}>90% Monthly Adherence</Text>
+            <Text style={styles.milestoneTitle}>90% Monthly Adherence Target</Text>
             <Text style={styles.milestoneDate}>Achieved Aug 31</Text>
           </View>
         </View>
@@ -78,25 +103,16 @@ export function HealthScoreCard({
         <View style={styles.milestoneItem}>
           <View style={styles.hollowDot} />
           <View>
-            <Text style={styles.milestoneTitle}>6-Month Check-up</Text>
+            <Text style={styles.milestoneTitle}>6-Month Check-up with Dr. Patel</Text>
             <Text style={styles.milestoneDate}>Upcoming Oct 15</Text>
           </View>
         </View>
       </View>
 
-      {/* Doctor Note */}
-      <View style={styles.doctorNoteCard}>
-        <View style={styles.noteHeader}>
-          <Text style={styles.doctorLabel}>DOCTOR'S NOTE</Text>
-          <Text style={styles.noteDate}>Sept 10</Text>
-        </View>
-        <Text style={styles.doctorName}>Dr. Patel</Text>
-        <Text style={styles.noteBody}>
-          "Blood pressure improving. Continue current medications. Next visit Oct 15."
-        </Text>
-      </View>
+
 
       <Pressable style={styles.historyOutlineBtn} onPress={onViewCompleteHistory}>
+        <Ionicons name="time-outline" size={18} color={Colors.light.primary} style={{ marginRight: 6 }} />
         <Text style={styles.historyOutlineBtnText}>View Complete History</Text>
       </Pressable>
     </View>

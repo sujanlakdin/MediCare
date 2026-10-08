@@ -58,7 +58,7 @@ exports.getPatients = async (req, res) => {
     let registeredPatients = [];
 
     try {
-      const users = await User.find({ role: { $ne: 'caregiver' } });
+      const users = await User.find({ role: { $nin: ['caregiver', 'Caregiver'] } });
       registeredPatients = users.map((u) => ({
         _id: u._id.toString(),
         name: u.fullName || 'Registered Patient',

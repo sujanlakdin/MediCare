@@ -24,27 +24,14 @@ export default function PatientsScreen() {
 
   const loadPatients = async () => {
     try {
-      const list = await patientApi.getPatients();
+      let list = await patientApi.getPatients();
 
-      // Ensure logged in user is present in patient list
-      if (user && user.fullName) {
-        const exists = list.some((p) => p._id === user.id || p.name.toLowerCase() === user.fullName.toLowerCase());
-        if (!exists) {
-          list.unshift({
-            _id: user.id || 'user-' + Date.now(),
-            name: user.fullName,
-            age: 65,
-            role: user.role === 'caregiver' ? 'Caregiver' : 'Patient',
-            statusBadgeText: 'MONITORING ACTIVE',
-            phone: '+94 77 123 4567',
-            vitals: {
-              bloodPressure: '120/80',
-              heartRate: 72,
-              bloodSugar: 110,
-            },
-          });
-        }
-      }
+      // Ensure caregivers are excluded from patient monitoring list
+      list = list.filter((p) => {
+        const isCaregiverRole = p.role && p.role.toLowerCase() === 'caregiver';
+        const isCurrentUserCaregiver = user && user.role === 'caregiver' && user.fullName && p.name.toLowerCase() === user.fullName.toLowerCase();
+        return !isCaregiverRole && !isCurrentUserCaregiver;
+      });
 
       setPatients(list);
       if (list.length > 0) {
@@ -132,23 +119,30 @@ export default function PatientsScreen() {
                 <Text style={styles.sectionTitle}>Today's Medication Timeline</Text>
                 <View style={styles.timelineCard}>
                   {medications.length > 0 ? (
-                    medications.map((med, index) => {
-                      const isLast = index === medications.length - 1;
-                      const status = med.status || (index === 0 || index === 1 ? 'taken' : index === 2 ? 'missed' : 'upcoming');
+                    medications.flatMap((med) => {
+                      const times = (med.scheduledTime || '08:00 AM').split(',').map((t) => t.trim());
+                      return times.map((singleTime, idx) => ({
+                        ...med,
+                        uniqueKey: `${med._id || med.id}-${idx}`,
+                        singleTime,
+                      }));
+                    }).map((item, index, arr) => {
+                      const isLast = index === arr.length - 1;
+                      const status = item.status || 'upcoming';
                       const dotStyle = status === 'taken' ? styles.dotGreen : status === 'missed' ? styles.dotRed : styles.dotGray;
                       const statusTextStyle = status === 'taken' ? styles.statusTaken : status === 'missed' ? styles.statusMissed : styles.statusUpcoming;
                       const statusLabel = status === 'taken' ? 'Taken' : status === 'missed' ? 'Missed' : 'Upcoming';
 
                       return (
-                        <View key={med._id || med.id || index} style={[styles.timelineItem, isLast && { borderBottomWidth: 0 }]}>
-                          <Text style={styles.timeLabel}>{med.scheduledTime || '08:00 AM'}</Text>
+                        <View key={item.uniqueKey} style={[styles.timelineItem, isLast && { borderBottomWidth: 0 }]}>
+                          <Text style={styles.timeLabel}>{item.singleTime}</Text>
                           <View style={dotStyle} />
                           <View style={styles.medCol}>
                             <Text style={styles.timelineMedTitle}>
-                              {med.name} {med.dosage && !med.name.includes(med.dosage) ? med.dosage : ''}
+                              {item.name} {item.dosage && !item.name.includes(item.dosage) ? item.dosage : ''}
                             </Text>
                             <Text style={statusTextStyle}>
-                              {statusLabel} {med.form ? `• ${med.form}` : ''}
+                              {statusLabel} {item.form ? `• ${item.form}` : ''}
                             </Text>
                           </View>
                         </View>
@@ -173,6 +167,7 @@ export default function PatientsScreen() {
           ) : (
             /* Medication List View */
             <MedicationList
+              patientId={selectedPatient?._id}
               onAddMedication={() => alert('Add Medication dialog opened!')}
               onEditSchedule={(med) => alert(`Edit schedule for ${med.name}`)}
             />
