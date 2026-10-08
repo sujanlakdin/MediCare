@@ -67,12 +67,8 @@ router.post("/login", async (req, res) => {
   const email = readEmail(req.body.email);
   const password = readString(req.body.password, "Password", { maxLength: 128 });
   const user = await User.findOne({ email }).select("+passwordHash");
-  if (!user) {
-    return res.status(401).json({ error: "No account found with this email. Please Sign Up first." });
-  }
-  const isMatch = await bcrypt.compare(password, user.passwordHash);
-  if (!isMatch) {
-    return res.status(401).json({ error: "Incorrect password. Please check your password and try again." });
+  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    return res.status(401).json({ error: "Email or password is incorrect." });
   }
   res.json({ token: issueToken(user), user: publicUser(user) });
 });
