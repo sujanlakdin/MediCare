@@ -99,7 +99,8 @@ export default function AddCaregiverScreen() {
       title={id ? 'Edit Caregiver' : 'Add Caregiver'}
       subtitle="Link a trusted helper to sync alerts"
       showBack={true}
-      activeTab="profile">
+      patientTab="settings"
+      hideBottomNav={false}>
       {isLoading ? (
         <View style={styles.state}>
           <ActivityIndicator size="large" color="#0E3E2F" />

@@ -126,7 +126,8 @@ export default function CaregiverSettingsScreen() {
       title="Emergency & Caregiver"
       subtitle="Manage your helper links and critical SOS triggers"
       showBack={true}
-      activeTab="profile">
+      patientTab="settings"
+      hideBottomNav={false}>
       {isLoading ? (
         <View style={styles.state}>
           <ActivityIndicator size="large" color="#0E3E2F" />
