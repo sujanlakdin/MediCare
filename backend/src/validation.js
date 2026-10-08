@@ -14,8 +14,11 @@ function readString(value, label, { required = true, maxLength = 300 } = {}) {
 }
 
 function readEmail(value, { required = true } = {}) {
-  const email = readString(value, "Email", { required, maxLength: 254 });
+  let email = readString(value, "Email", { required, maxLength: 254 });
   if (email === undefined || (!required && !email)) return email || "";
+  if (email.includes("@") && !email.includes(".")) {
+    email = `${email}.com`;
+  }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail("Enter a valid email address.");
   return email.toLowerCase();
 }

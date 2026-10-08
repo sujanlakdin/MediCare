@@ -50,7 +50,12 @@ export default function LoginScreen({ navigation }) {
 
   const validate = () => {
     let valid = true;
-    const cleanId = identifier.trim();
+    let cleanId = identifier.trim();
+
+    // Auto-fix missing domain (e.g. sujanlakdin@2004 -> sujanlakdin@2004.com)
+    if (cleanId.includes('@') && !cleanId.includes('.')) {
+      cleanId = `${cleanId}.com`;
+    }
 
     if (!cleanId) {
       setIdError('Enter your email or phone number');
@@ -80,7 +85,12 @@ export default function LoginScreen({ navigation }) {
 
     setLoading(true);
     try {
-      await signIn(identifier.trim(), password);
+      let cleanId = identifier.trim();
+      if (cleanId.includes('@') && !cleanId.includes('.')) {
+        cleanId = `${cleanId}.com`;
+        setIdentifier(cleanId);
+      }
+      await signIn(cleanId, password);
       showToast('Login successful!');
       setTimeout(() => {
         router.replace('/');
