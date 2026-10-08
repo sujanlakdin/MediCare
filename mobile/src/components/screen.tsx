@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 
 import { CareIcon } from '@/components/care-icon';
 import { BottomNavBar, type TabKey } from '@/components/bottom-nav-bar';
+import PatientBottomNav, { type PatientTabName } from '@/components/patient/BottomNav';
 import { useAccessibility } from '@/contexts/accessibility-context';
 
 type ScreenProps = PropsWithChildren<{
@@ -14,6 +15,7 @@ type ScreenProps = PropsWithChildren<{
   onBack?: () => void;
   rightAction?: ReactNode;
   activeTab?: TabKey;
+  patientTab?: PatientTabName;
   hideBottomNav?: boolean;
 }>;
 
@@ -24,6 +26,7 @@ export function Screen({
   onBack,
   rightAction,
   activeTab = 'profile',
+  patientTab,
   hideBottomNav = true,
   children,
 }: ScreenProps) {
@@ -88,7 +91,11 @@ export function Screen({
         </ScrollView>
 
         {/* Global Bottom Navigation Bar */}
-        {!hideBottomNav ? <BottomNavBar activeTab={activeTab} /> : null}
+        {!hideBottomNav
+          ? patientTab
+            ? <PatientBottomNav currentTab={patientTab} />
+            : <BottomNavBar activeTab={activeTab} />
+          : null}
       </View>
     </SafeAreaView>
   );

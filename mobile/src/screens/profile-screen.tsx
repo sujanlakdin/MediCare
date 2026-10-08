@@ -260,7 +260,9 @@ export default function ProfileScreen() {
     <Screen
       title="My Profile"
       subtitle="View your personal and medical profile details."
-      activeTab="profile">
+      activeTab="profile"
+      patientTab="profile"
+      hideBottomNav={false}>
       {isLoading ? (
         <View style={styles.state}>
           <ActivityIndicator size="large" color="#0E3E2F" accessibilityLabel="Loading profile" />

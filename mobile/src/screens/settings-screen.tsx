@@ -69,7 +69,9 @@ export default function SettingsScreen() {
     <Screen
       title="Settings"
       subtitle="Control and configure your application"
-      activeTab="profile">
+      activeTab="profile"
+      patientTab="settings"
+      hideBottomNav={false}>
       {/* Settings Options Card */}
       <View style={styles.card}>
         {items.map((item, index) => {
