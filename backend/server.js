@@ -83,10 +83,14 @@ mongoose
 const profileRoutes = require("./routes/profileRoutes");
 const medicationRoutes = require("./routes/medicationRoutes");
 const patientRoutes = require("./routes/patientRoutes");
+const reminderRoutes = require("./routes/reminderRoutes");
+const doseLogRoutes = require("./routes/doseLogRoutes");
 
 app.use("/api/profile", authenticate, profileRoutes);
 app.use("/api/medications", authenticate, medicationRoutes);
 app.use("/api/patients", patientRoutes);
+app.use("/api/reminders", authenticate, reminderRoutes);
+app.use("/api/dose-logs", authenticate, doseLogRoutes);
 
 app.get("/", (req, res) => {
   res.json({
