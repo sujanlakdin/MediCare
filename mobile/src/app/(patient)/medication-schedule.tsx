@@ -5,18 +5,28 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Pressable,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, Tabs, Stack } from 'expo-router';
+import { useRouter, Stack, type Href } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, MaxContentWidth } from '@/constants/theme';
+import { BottomNavBar } from '@/components/bottom-nav-bar';
 import { useMedicareStore, ScheduleItem } from '@/medicare';
 
 export default function MedicationScheduleScreen() {
   const router = useRouter();
   const { schedule } = useMedicareStore();
+
+  // Back arrow always returns to the Main Menu
+  const handleBack = () => {
+    router.navigate('/(app)/(tabs)/menu' as Href);
+  };
+
+  const todayLabel = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  });
 
   // Group items dynamically by period computed from reminder time
   const morningItems = schedule.filter((item) => item.period === 'MORNING');
@@ -176,7 +186,6 @@ export default function MedicationScheduleScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       {/* Hide default headers for this screen */}
       <Stack.Screen options={{ headerShown: false }} />
-      <Tabs.Screen options={{ tabBarStyle: { display: 'none' }, headerShown: false }} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -185,9 +194,19 @@ export default function MedicationScheduleScreen() {
           {/* Dark Forest Green Header Banner */}
           <View style={styles.darkBanner}>
             <View style={styles.bannerTopRow}>
-              <View>
-                <Text style={styles.todayHeading}>Today</Text>
-                <Text style={styles.dateSubtext}>Thursday, Oct 24</Text>
+              <View style={styles.bannerLeft}>
+                <TouchableOpacity
+                  style={styles.backButton}
+                  onPress={handleBack}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Back to Main Menu"
+                  accessibilityRole="button">
+                  <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+                </TouchableOpacity>
+                <View>
+                  <Text style={styles.todayHeading}>Today</Text>
+                  <Text style={styles.dateSubtext}>{todayLabel}</Text>
+                </View>
               </View>
               <TouchableOpacity
                 style={styles.addFab}
@@ -277,48 +296,8 @@ export default function MedicationScheduleScreen() {
         </View>
       </ScrollView>
 
-      {/* Bottom Navigation matching design */}
-      <View style={styles.bottomNavContainer}>
-        <View style={styles.bottomNavRow}>
-          <Pressable
-            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
-            onPress={() => router.navigate({ pathname: '/medication-schedule' })}>
-            <Ionicons name="grid-outline" size={22} color={Colors.light.tabInactive} />
-            <Text style={styles.navLabel}>Dashboard</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
-            onPress={() => router.push({ pathname: '/patients' })}>
-            <Ionicons name="people-outline" size={22} color={Colors.light.tabInactive} />
-            <Text style={styles.navLabel}>Patients</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
-            onPress={() => router.push({ pathname: '/adherence' })}>
-            <Ionicons name="stats-chart-outline" size={22} color={Colors.light.tabInactive} />
-            <Text style={styles.navLabel}>Reports</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
-            onPress={() => router.push({ pathname: '/alerts' })}>
-            <Ionicons name="notifications" size={22} color={Colors.light.accent} />
-            <Text style={[styles.navLabel, styles.navLabelActive]}>Alerts</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
-            onPress={() => router.push({ pathname: '/profile' })}>
-            <Ionicons name="person-outline" size={22} color={Colors.light.tabInactive} />
-            <Text style={styles.navLabel}>Profile</Text>
-          </Pressable>
-        </View>
-
-        {/* Home Indicator */}
-        <View style={styles.homeIndicator} />
-      </View>
+      {/* Team's shared bottom bar */}
+      <BottomNavBar activeTab="alerts" />
     </SafeAreaView>
   );
 }
@@ -343,6 +322,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 24,
+  },
+  bannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   bannerTopRow: {
     flexDirection: 'row',
@@ -634,45 +626,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
-  },
-  bottomNavContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 4 : 8,
-  },
-  bottomNavRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  navItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-  },
-  navItemPressed: {
-    opacity: 0.6,
-  },
-  navLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: Colors.light.tabInactive,
-    marginTop: 4,
-  },
-  navLabelActive: {
-    color: '#10B981',
-    fontWeight: '700',
-  },
-  homeIndicator: {
-    width: 134,
-    height: 5,
-    backgroundColor: '#0F172A',
-    borderRadius: 2.5,
-    alignSelf: 'center',
-    marginTop: 8,
-    marginBottom: 4,
   },
 });
