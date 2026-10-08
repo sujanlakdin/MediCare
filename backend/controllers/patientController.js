@@ -62,14 +62,18 @@ exports.getPatients = async (req, res) => {
       registeredPatients = users.map((u) => ({
         _id: u._id.toString(),
         name: u.fullName || 'Registered Patient',
-        age: 65,
+        age: u.age || 65,
         role: 'Patient',
         statusBadgeText: 'MONITORING ACTIVE',
-        phone: u.emergencyContact?.phone || '+1 (555) 019-0000',
+        phone: u.emergencyContact?.phone || u.phone || '+94 77 000 0000',
+        bloodGroup: u.bloodGroup || 'O+',
+        primaryDiagnosis: u.primaryDiagnosis || 'General Monitoring',
+        allergies: u.allergies || 'None recorded',
+        avatarUrl: u.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
         vitals: {
-          bloodPressure: '120/80',
-          heartRate: 75,
-          bloodSugar: 115,
+          bloodPressure: u.vitals?.bloodPressure || '120/80',
+          heartRate: u.vitals?.heartRate || 75,
+          bloodSugar: u.vitals?.bloodSugar || 115,
           lastUpdated: new Date(),
         },
       }));

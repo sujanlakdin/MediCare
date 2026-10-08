@@ -135,6 +135,11 @@ export interface PatientItem {
   role: string;
   statusBadgeText: string;
   phone: string;
+  bloodGroup?: string;
+  primaryDiagnosis?: string;
+  allergies?: string;
+  avatarUrl?: string;
+  emergencyContact?: string;
   vitals: {
     bloodPressure: string;
     heartRate: number;
@@ -149,7 +154,12 @@ export const DEFAULT_PATIENTS: PatientItem[] = [
     age: 68,
     role: 'Patient',
     statusBadgeText: 'MONITORING ACTIVE',
-    phone: '+1 (555) 019-2831',
+    phone: '+94 77 123 4567',
+    bloodGroup: 'O+',
+    primaryDiagnosis: 'Hypertension & Type 2 Diabetes',
+    allergies: 'Penicillin, Sulfa drugs',
+    emergencyContact: '0701982984',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
     vitals: {
       bloodPressure: '128/82',
       heartRate: 72,
@@ -162,7 +172,12 @@ export const DEFAULT_PATIENTS: PatientItem[] = [
     age: 74,
     role: 'Patient',
     statusBadgeText: 'MONITORING ACTIVE',
-    phone: '+1 (555) 019-4412',
+    phone: '+94 71 987 6543',
+    bloodGroup: 'A+',
+    primaryDiagnosis: 'Post-Stroke Rehabilitation',
+    allergies: 'None recorded',
+    emergencyContact: '0701982984',
+    avatarUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150',
     vitals: {
       bloodPressure: '135/88',
       heartRate: 78,
@@ -175,7 +190,12 @@ export const DEFAULT_PATIENTS: PatientItem[] = [
     age: 62,
     role: 'Patient',
     statusBadgeText: 'ATTENTION NEEDED',
-    phone: '+1 (555) 019-8890',
+    phone: '+94 70 198 2984',
+    bloodGroup: 'B+',
+    primaryDiagnosis: 'Mild Asthma & Joint Osteoarthritis',
+    allergies: 'Aspirin, Shellfish',
+    emergencyContact: '0701982984',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
     vitals: {
       bloodPressure: '142/92',
       heartRate: 84,

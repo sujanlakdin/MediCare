@@ -25,6 +25,19 @@ export default function ProfileScreen() {
   const [emergencyModalVisible, setEmergencyModalVisible] = useState<boolean>(false);
   const [editProfileModalVisible, setEditProfileModalVisible] = useState<boolean>(false);
 
+  const [toast, setToast] = useState<{ message: string; visible: boolean; type: 'success' | 'info' }>({
+    message: '',
+    visible: false,
+    type: 'success',
+  });
+
+  const showToast = (message: string, type: 'success' | 'info' = 'success') => {
+    setToast({ message, visible: true, type });
+    setTimeout(() => {
+      setToast((prev) => ({ ...prev, visible: false }));
+    }, 2500);
+  };
+
   const [caregiverProfile, setCaregiverProfile] = useState<CaregiverProfileData>(
     caregiverProfileStore.getProfile()
   );
@@ -183,27 +196,64 @@ export default function ProfileScreen() {
                   patients.map((patient) => {
                     const isSelected = patient._id === selectedPatientId;
                     return (
-                      <Pressable
+                      <View
                         key={patient._id || patient.name}
                         style={[
-                          styles.dropdownItemRow,
-                          isSelected && styles.dropdownItemActive,
-                        ]}
-                        onPress={() => handleSelectPatient(patient)}>
-                        <Image
-                          source={{
-                            uri: (patient as any).avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
-                          }}
-                          style={styles.patientAvatarSmall}
-                        />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.patientNameSmall}>{patient.name}</Text>
-                          <Text style={styles.patientSubSmall}>Age {patient.age || 68} • Patient</Text>
+                          styles.dropdownItemContainer,
+                          isSelected && styles.dropdownItemActiveContainer,
+                        ]}>
+                        <Pressable
+                          style={styles.dropdownItemRow}
+                          onPress={() => handleSelectPatient(patient)}>
+                          <Image
+                            source={{
+                              uri: patient.avatarUrl || (patient as any).avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
+                            }}
+                            style={styles.patientAvatarSmall}
+                          />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.patientNameSmall}>{patient.name}</Text>
+                            <Text style={styles.patientSubSmall}>
+                              Age {patient.age || 68} • {patient.bloodGroup ? `Blood ${patient.bloodGroup}` : 'Patient'}
+                            </Text>
+                          </View>
+                          {isSelected && (
+                            <View style={styles.selectedBadgeWrap}>
+                              <Ionicons name="checkmark-circle" size={20} color={Colors.light.primary} />
+                            </View>
+                          )}
+                        </Pressable>
+
+                        {/* Rich Patient Details Snippet */}
+                        <View style={styles.patientDetailsSnippet}>
+                          <View style={styles.detailTagRow}>
+                            <View style={styles.detailTag}>
+                              <Ionicons name="medical" size={12} color={Colors.light.primary} />
+                              <Text style={styles.detailTagText}>
+                                {patient.primaryDiagnosis || 'Hypertension & Type 2 Diabetes'}
+                              </Text>
+                            </View>
+                            <View style={[styles.detailTag, { backgroundColor: '#FEE2E2' }]}>
+                              <Ionicons name="warning" size={12} color="#DC2626" />
+                              <Text style={[styles.detailTagText, { color: '#DC2626' }]}>
+                                {patient.allergies || 'Penicillin'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.vitalsRow}>
+                            <Text style={styles.vitalText}>
+                              🩺 BP: <Text style={styles.vitalVal}>{patient.vitals?.bloodPressure || '128/82'}</Text>
+                            </Text>
+                            <Text style={styles.vitalText}>
+                              💓 HR: <Text style={styles.vitalVal}>{patient.vitals?.heartRate || 72} bpm</Text>
+                            </Text>
+                            <Text style={styles.vitalText}>
+                              📞 Phone: <Text style={styles.vitalVal}>{patient.phone || '0701982984'}</Text>
+                            </Text>
+                          </View>
                         </View>
-                        {isSelected && (
-                          <Ionicons name="checkmark-circle" size={18} color={Colors.light.primary} />
-                        )}
-                      </Pressable>
+                      </View>
                     );
                   })
                 ) : (
@@ -223,7 +273,13 @@ export default function ProfileScreen() {
                 <Text style={styles.toggleLabel}>Missed Dose Alerts</Text>
                 <Switch
                   value={missedAlerts}
-                  onValueChange={setMissedAlerts}
+                  onValueChange={(val) => {
+                    setMissedAlerts(val);
+                    showToast(
+                      val ? 'Missed Dose Alerts Turned ON 🚨' : 'Missed Dose Alerts Turned OFF 🔕',
+                      val ? 'success' : 'info'
+                    );
+                  }}
                   trackColor={{ false: '#CBD5E1', true: Colors.light.accent }}
                 />
               </View>
@@ -232,7 +288,13 @@ export default function ProfileScreen() {
                 <Text style={styles.toggleLabel}>Refill Reminders</Text>
                 <Switch
                   value={refillReminders}
-                  onValueChange={setRefillReminders}
+                  onValueChange={(val) => {
+                    setRefillReminders(val);
+                    showToast(
+                      val ? 'Refill Reminders Turned ON 💊' : 'Refill Reminders Turned OFF 🔕',
+                      val ? 'success' : 'info'
+                    );
+                  }}
                   trackColor={{ false: '#CBD5E1', true: Colors.light.accent }}
                 />
               </View>
@@ -241,7 +303,13 @@ export default function ProfileScreen() {
                 <Text style={styles.toggleLabel}>Daily Summary</Text>
                 <Switch
                   value={dailySummary}
-                  onValueChange={setDailySummary}
+                  onValueChange={(val) => {
+                    setDailySummary(val);
+                    showToast(
+                      val ? 'Daily Summary Turned ON 📊' : 'Daily Summary Turned OFF 🔕',
+                      val ? 'success' : 'info'
+                    );
+                  }}
                   trackColor={{ false: '#CBD5E1', true: Colors.light.accent }}
                 />
               </View>
@@ -250,7 +318,13 @@ export default function ProfileScreen() {
                 <Text style={styles.toggleLabel}>Appointment Reminders</Text>
                 <Switch
                   value={appointmentReminders}
-                  onValueChange={setAppointmentReminders}
+                  onValueChange={(val) => {
+                    setAppointmentReminders(val);
+                    showToast(
+                      val ? 'Appointment Reminders Turned ON 📅' : 'Appointment Reminders Turned OFF 🔕',
+                      val ? 'success' : 'info'
+                    );
+                  }}
                   trackColor={{ false: '#CBD5E1', true: Colors.light.accent }}
                 />
               </View>
@@ -327,6 +401,20 @@ export default function ProfileScreen() {
           Alert.alert('Profile Reset! 🗑️', 'Caregiver profile details have been reset to default.');
         }}
       />
+
+      {/* Floating Toast Notification Banner */}
+      {toast.visible && (
+        <View style={styles.toastContainer}>
+          <View style={[styles.toastBanner, toast.type === 'info' && styles.toastBannerInfo]}>
+            <Ionicons
+              name={toast.type === 'success' ? 'notifications' : 'notifications-off'}
+              size={20}
+              color="#FFFFFF"
+            />
+            <Text style={styles.toastText}>{toast.message}</Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -572,5 +660,91 @@ const styles = StyleSheet.create({
   versionText: {
     fontSize: 12,
     color: Colors.light.textMuted,
+  },
+  dropdownItemContainer: {
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  dropdownItemActiveContainer: {
+    backgroundColor: '#E6F4EE',
+    borderColor: Colors.light.primary,
+  },
+  selectedBadgeWrap: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  patientDetailsSnippet: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.06)',
+    gap: 6,
+  },
+  detailTagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  detailTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 4,
+  },
+  detailTagText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#0369A1',
+  },
+  vitalsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 2,
+  },
+  vitalText: {
+    fontSize: 11,
+    color: Colors.light.textSecondary,
+    fontWeight: '500',
+  },
+  vitalVal: {
+    fontWeight: '700',
+    color: Colors.light.text,
+  },
+  toastContainer: {
+    position: 'absolute',
+    top: 50,
+    right: 16,
+    zIndex: 9999,
+    alignItems: 'flex-end',
+  },
+  toastBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#059669', // Emerald success green
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  toastBannerInfo: {
+    backgroundColor: '#475569', // Slate info grey
+  },
+  toastText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
