@@ -32,6 +32,29 @@ const ReminderSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    dose: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 40,
+    },
+    instructions: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 500,
+    },
+    notificationSound: {
+      type: String,
+      default: 'Morning Dew',
+      maxlength: 80,
+    },
+    snoozeCountRemaining: {
+      type: Number,
+      default: 2,
+      min: 0,
+      max: 2,
+    },
     note: {
       type: String,
       default: '',

@@ -4,6 +4,7 @@ const Medication = require('../models/Medication');
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 const FIELDS = [
   'medicationId',
   'time',
@@ -11,6 +12,10 @@ const FIELDS = [
   'startDate',
   'snoozeEnabled',
   'note',
+  'dose',
+  'instructions',
+  'notificationSound',
+  'snoozeCountRemaining',
 ];
 
 function validate(data) {
@@ -33,6 +38,7 @@ function validate(data) {
   }
 
   const date = new Date(`${data.startDate}T00:00:00.000Z`);
+
   if (
     Number.isNaN(date.getTime()) ||
     date.toISOString().slice(0, 10) !== data.startDate
@@ -61,24 +67,62 @@ function validate(data) {
     return 'Note must be text with 200 characters or less';
   }
 
+  const textLimits = [
+    ['dose', 40],
+    ['instructions', 500],
+    ['notificationSound', 80],
+  ];
+
+  for (const [field, limit] of textLimits) {
+    if (
+      data[field] !== undefined &&
+      (typeof data[field] !== 'string' || data[field].length > limit)
+    ) {
+      return `${field} must be text with ${limit} characters or less`;
+    }
+  }
+
+  if (
+    data.snoozeCountRemaining !== undefined &&
+    (
+      !Number.isInteger(data.snoozeCountRemaining) ||
+      data.snoozeCountRemaining < 0 ||
+      data.snoozeCountRemaining > 2
+    )
+  ) {
+    return 'Remaining snoozes must be an integer between 0 and 2';
+  }
+
   return null;
 }
 
 function pickFields(body) {
   const result = {};
+
   for (const field of FIELDS) {
-    if (body[field] !== undefined) result[field] = body[field];
+    if (body[field] !== undefined) {
+      result[field] = body[field];
+    }
   }
+
   return result;
 }
 
 function handleError(res, error) {
-  if (error.name === 'ValidationError' || error.name === 'CastError') {
-    return res.status(400).json({ message: 'Invalid reminder data' });
+  if (
+    error.name === 'ValidationError' ||
+    error.name === 'CastError'
+  ) {
+    return res.status(400).json({
+      message: 'Invalid reminder data',
+    });
   }
 
   console.error('Reminder operation failed:', error);
-  return res.status(500).json({ message: 'Reminder operation failed' });
+
+  return res.status(500).json({
+    message: 'Reminder operation failed',
+  });
 }
 
 async function ownsMedication(medicationId, userId) {
@@ -93,30 +137,47 @@ async function ownsMedication(medicationId, userId) {
 }
 
 async function isDuplicate(userId, medicationId, time, ignoreId) {
-  const query = { userId, medicationId, time };
-  if (ignoreId) query._id = { $ne: ignoreId };
+  const query = {
+    userId,
+    medicationId,
+    time,
+  };
+
+  if (ignoreId) {
+    query._id = { $ne: ignoreId };
+  }
+
   return Boolean(await Reminder.exists(query));
 }
 
 exports.getReminders = async (req, res) => {
   try {
     if (!req.userId) {
-      return res.status(401).json({ message: 'Authentication required' });
+      return res.status(401).json({
+        message: 'Authentication required',
+      });
     }
 
-    const filter = { userId: req.userId };
+    const filter = {
+      userId: req.userId,
+    };
 
     if (req.query.medicationId !== undefined) {
       if (
         typeof req.query.medicationId !== 'string' ||
         !mongoose.isValidObjectId(req.query.medicationId)
       ) {
-        return res.status(400).json({ message: 'Invalid medicationId' });
+        return res.status(400).json({
+          message: 'Invalid medicationId',
+        });
       }
+
       filter.medicationId = req.query.medicationId;
     }
 
-    return res.json(await Reminder.find(filter).sort({ time: 1 }));
+    return res.json(
+      await Reminder.find(filter).sort({ time: 1 })
+    );
   } catch (error) {
     return handleError(res, error);
   }
@@ -125,10 +186,15 @@ exports.getReminders = async (req, res) => {
 exports.getReminderById = async (req, res) => {
   try {
     if (!req.userId) {
-      return res.status(401).json({ message: 'Authentication required' });
+      return res.status(401).json({
+        message: 'Authentication required',
+      });
     }
+
     if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid id' });
+      return res.status(400).json({
+        message: 'Invalid id',
+      });
     }
 
     const reminder = await Reminder.findOne({
@@ -137,7 +203,9 @@ exports.getReminderById = async (req, res) => {
     });
 
     if (!reminder) {
-      return res.status(404).json({ message: 'Reminder not found' });
+      return res.status(404).json({
+        message: 'Reminder not found',
+      });
     }
 
     return res.json(reminder);
@@ -149,22 +217,36 @@ exports.getReminderById = async (req, res) => {
 exports.createReminder = async (req, res) => {
   try {
     if (!req.userId) {
-      return res.status(401).json({ message: 'Authentication required' });
+      return res.status(401).json({
+        message: 'Authentication required',
+      });
     }
 
     const data = pickFields(req.body || {});
     const validationError = validate(data);
+
     if (validationError) {
-      return res.status(400).json({ message: validationError });
+      return res.status(400).json({
+        message: validationError,
+      });
     }
 
     if (!(await ownsMedication(data.medicationId, req.userId))) {
-      return res.status(404).json({ message: 'Owned medication not found' });
+      return res.status(404).json({
+        message: 'Owned medication not found',
+      });
     }
 
-    if (await isDuplicate(req.userId, data.medicationId, data.time)) {
+    if (
+      await isDuplicate(
+        req.userId,
+        data.medicationId,
+        data.time
+      )
+    ) {
       return res.status(400).json({
-        message: 'A reminder already exists for this medication at this time',
+        message:
+          'A reminder already exists for this medication at this time',
       });
     }
 
@@ -182,10 +264,15 @@ exports.createReminder = async (req, res) => {
 exports.updateReminder = async (req, res) => {
   try {
     if (!req.userId) {
-      return res.status(401).json({ message: 'Authentication required' });
+      return res.status(401).json({
+        message: 'Authentication required',
+      });
     }
+
     if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid id' });
+      return res.status(400).json({
+        message: 'Invalid id',
+      });
     }
 
     const reminder = await Reminder.findOne({
@@ -194,23 +281,33 @@ exports.updateReminder = async (req, res) => {
     });
 
     if (!reminder) {
-      return res.status(404).json({ message: 'Reminder not found' });
+      return res.status(404).json({
+        message: 'Reminder not found',
+      });
     }
 
     const updates = pickFields(req.body || {});
+
     const merged = {
       ...reminder.toObject(),
       ...updates,
-      medicationId: String(updates.medicationId ?? reminder.medicationId),
+      medicationId: String(
+        updates.medicationId ?? reminder.medicationId
+      ),
     };
 
     const validationError = validate(merged);
+
     if (validationError) {
-      return res.status(400).json({ message: validationError });
+      return res.status(400).json({
+        message: validationError,
+      });
     }
 
     if (!(await ownsMedication(merged.medicationId, req.userId))) {
-      return res.status(404).json({ message: 'Owned medication not found' });
+      return res.status(404).json({
+        message: 'Owned medication not found',
+      });
     }
 
     if (
@@ -222,12 +319,14 @@ exports.updateReminder = async (req, res) => {
       )
     ) {
       return res.status(400).json({
-        message: 'A reminder already exists for this medication at this time',
+        message:
+          'A reminder already exists for this medication at this time',
       });
     }
 
     Object.assign(reminder, updates);
     await reminder.save();
+
     return res.json(reminder);
   } catch (error) {
     return handleError(res, error);
@@ -237,10 +336,15 @@ exports.updateReminder = async (req, res) => {
 exports.deleteReminder = async (req, res) => {
   try {
     if (!req.userId) {
-      return res.status(401).json({ message: 'Authentication required' });
+      return res.status(401).json({
+        message: 'Authentication required',
+      });
     }
+
     if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid id' });
+      return res.status(400).json({
+        message: 'Invalid id',
+      });
     }
 
     const reminder = await Reminder.findOneAndDelete({
@@ -249,10 +353,14 @@ exports.deleteReminder = async (req, res) => {
     });
 
     if (!reminder) {
-      return res.status(404).json({ message: 'Reminder not found' });
+      return res.status(404).json({
+        message: 'Reminder not found',
+      });
     }
 
-    return res.json({ message: 'Reminder deleted successfully' });
+    return res.json({
+      message: 'Reminder deleted successfully',
+    });
   } catch (error) {
     return handleError(res, error);
   }
