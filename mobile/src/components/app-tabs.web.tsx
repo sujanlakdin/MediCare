@@ -1,13 +1,16 @@
 import { Tabs, TabList, TabTrigger, TabSlot, type TabTriggerSlotProps } from 'expo-router/ui';
 import type { Href } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function AppTabs() {
+  const { user } = useAuth();
+
   return (
     <Tabs>
       <TabSlot />
       <TabList asChild>
-        <View style={styles.tabBar}>
+        <View style={StyleSheet.flatten([styles.tabBar, user?.role === 'patient' && styles.hidden])}>
           <TabTrigger name="index" href={'/(app)/(tabs)' as Href} asChild>
             <TabBtn label="Dashboard" />
           </TabTrigger>
@@ -32,7 +35,7 @@ function TabBtn({ label, isFocused, onPress }: TabTriggerSlotProps & { label: st
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={[styles.tab, isFocused && styles.tabActive]}>
+      style={StyleSheet.flatten([styles.tab, isFocused && styles.tabActive])}>
       <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>{label}</Text>
     </Pressable>
   );
@@ -48,6 +51,9 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingHorizontal: 8,
     justifyContent: 'space-around',
+  },
+  hidden: {
+    display: 'none',
   },
   tab: {
     flex: 1,

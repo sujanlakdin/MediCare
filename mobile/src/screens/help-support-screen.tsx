@@ -93,7 +93,8 @@ export default function HelpSupportScreen() {
       title="Help & Support"
       subtitle="Get assistance, FAQs and medical guidance"
       showBack={true}
-      activeTab="profile">
+      patientTab="settings"
+      hideBottomNav={false}>
       <View style={styles.container}>
         {/* Top 2 Quick Action Cards (Side-by-Side) */}
         <View style={styles.quickGrid}>

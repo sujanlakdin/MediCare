@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack, type Href } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, MaxContentWidth } from '@/constants/theme';
-import { BottomNavBar } from '@/components/bottom-nav-bar';
+import PatientBottomNav from '@/components/patient/BottomNav';
 import { useMedicareStore, ScheduleItem } from '@/medicare';
 
 export default function MedicationScheduleScreen() {
@@ -296,8 +296,7 @@ export default function MedicationScheduleScreen() {
         </View>
       </ScrollView>
 
-      {/* Team's shared bottom bar */}
-      <BottomNavBar activeTab="alerts" />
+      <PatientBottomNav currentTab="home" />
     </SafeAreaView>
   );
 }

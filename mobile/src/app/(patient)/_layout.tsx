@@ -15,6 +15,9 @@ export default function PatientLayout() {
       <Stack.Screen name="medications" />
       <Stack.Screen name="medication-detail" />
       <Stack.Screen name="medication-form" />
+      <Stack.Screen name="settings" />
+      <Stack.Screen name="profile" />
+      <Stack.Screen name="menu" />
     </Stack>
   );
 }

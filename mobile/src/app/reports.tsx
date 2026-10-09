@@ -9,6 +9,7 @@ import { WeeklyChart } from '@/components/caregiver/WeeklyChart';
 import { HealthScoreCard } from '@/components/caregiver/HealthScoreCard';
 import { Colors, MaxContentWidth } from '@/constants/theme';
 import { downloadReport } from '@/services/reportGenerator';
+import BottomNav from '@/components/patient/BottomNav';
 
 export default function ReportsScreen() {
   const router = useRouter();
@@ -183,6 +184,7 @@ export default function ReportsScreen() {
           )}
         </View>
       </ScrollView>
+      <BottomNav currentTab="report" />
     </SafeAreaView>
   );
 }

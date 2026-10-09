@@ -16,5 +16,5 @@ export default function IndexRoute() {
   if (!token) return <Redirect href="/(auth)/splash" />;
 
   if (user?.role === 'caregiver') return <Redirect href={"/(caregiver)" as any} />;
-  return <Redirect href={"/(app)/(tabs)" as any} />;
+  return <Redirect href={"/(patient)/dashboard" as any} />;
 }

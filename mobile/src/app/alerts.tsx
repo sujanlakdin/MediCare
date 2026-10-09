@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View, Text, Pressable, Linking, Alert } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, MaxContentWidth } from '@/constants/theme';
+import BottomNav from '@/components/patient/BottomNav';
 
 export default function AlertsScreen() {
   const [filter, setFilter] = useState<'all' | 'critical' | 'resolved'>('all');
@@ -181,6 +182,7 @@ export default function AlertsScreen() {
           </View>
         </View>
       </ScrollView>
+      <BottomNav currentTab="alert" />
     </SafeAreaView>
   );
 }

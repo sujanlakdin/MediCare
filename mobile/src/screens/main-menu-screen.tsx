@@ -83,7 +83,8 @@ export default function MainMenuScreen() {
     <Screen
       title="Main Menu"
       subtitle="Explore all features of CareRx"
-      activeTab="dashboard">
+      patientTab="home"
+      hideBottomNav={false}>
       <View style={styles.menuList}>
         {menuItems.map((item) => (
           <Pressable

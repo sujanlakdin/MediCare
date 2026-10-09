@@ -1,8 +1,12 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function AppTabs() {
+  const { user } = useAuth();
+
   return (
     <NativeTabs
+      hidden={user?.role === 'patient'}
       backgroundColor="#FFFFFF"
       indicatorColor="#E8F6EF"
       labelStyle={{ selected: { color: '#0E3E2F' } }}>

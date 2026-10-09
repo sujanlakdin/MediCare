@@ -2,9 +2,21 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { PATIENT_COLORS } from '../../constants/patientTheme';
+import { useAuth } from '../../contexts/auth-context';
 import PatientIcon from './PatientIcons';
 
-export type PatientTabName = 'dashboard' | 'medications' | 'reminders' | 'adherence' | 'profile';
+export type PatientTabName =
+  | 'home'
+  | 'alert'
+  | 'report'
+  | 'settings'
+  | 'profile'
+  | 'dashboard'
+  | 'medications'
+  | 'reminders'
+  | 'adherence';
+
+type PatientNavItemKey = 'home' | 'alert' | 'report' | 'settings' | 'profile';
 
 interface BottomNavProps {
   currentTab?: PatientTabName;
@@ -12,29 +24,28 @@ interface BottomNavProps {
 }
 
 interface NavItemDef {
-  key: PatientTabName;
+  key: PatientNavItemKey;
   label: string;
-  icon: 'home' | 'pill' | 'bell' | 'chart' | 'user';
+  icon: 'home' | 'bell' | 'chart' | 'settings' | 'user';
   route?: string;
 }
 
 const NAV_ITEMS: NavItemDef[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'home', route: '/(patient)/dashboard' },
-  { key: 'medications', label: 'Medications', icon: 'pill', route: '/(patient)/medications' },
-  { key: 'reminders', label: 'Reminders', icon: 'bell', route: '/settings/notifications' },
-  { key: 'adherence', label: 'Adherence', icon: 'chart', route: '/(patient)/dashboard' },
-  { key: 'profile', label: 'Profile', icon: 'user', route: '/(app)/(tabs)/profile' },
+  { key: 'home', label: 'Home', icon: 'home', route: '/(patient)/menu' },
+  { key: 'alert', label: 'Alert', icon: 'bell', route: '/alerts' },
+  { key: 'report', label: 'Report', icon: 'chart', route: '/reports' },
+  { key: 'settings', label: 'Settings', icon: 'settings', route: '/(patient)/settings' },
+  { key: 'profile', label: 'Profile', icon: 'user', route: '/(patient)/profile' },
 ];
 
 /**
- * Bottom Navigation Bar
- * 5 items matching the reference layout:
- * - Dashboard: navigates to /dashboard
- * - Medications: navigates to /medications
- * - Reminders opens notification settings; Adherence opens its dashboard summary;
- *   Profile opens the shared profile screen.
+ * Patient navigation for Home, Alert, Report, Settings, and Profile.
  */
 export default function BottomNav({ currentTab }: BottomNavProps) {
+  const { user } = useAuth();
+
+  if (user?.role !== 'patient') return null;
+
   const handlePress = (item: NavItemDef) => {
     if (item.route) {
       if (item.key === currentTab) return;
