@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,38 +14,53 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Tabs, Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { MaxContentWidth } from '@/constants/theme';
-import { useMedicareStore, markTaken, undoDoseLog, goBackTo } from '@/medicare';
+import {
+  useMedicareStore,
+  markTaken,
+  getTodayDoseLog,
+  updateDoseLog,
+  deleteDoseLog,
+  goBackTo,
+} from '@/medicare';
 
 const AVAILABLE_SIDE_EFFECTS = ['Nausea', 'Dizziness', 'Headache'];
 
 export default function MarkAsTakenScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string; medicationId?: string; from?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    medicationId?: string;
+    from?: string;
+  }>();
   const medId = params.id || params.medicationId;
 
-  const { medications, reminders, doseLogs } = useMedicareStore();
+  const { medications, reminders } = useMedicareStore();
 
-  const currentMed =
-    medications.find((m) => m.id === medId) ||
-    medications.find((m) => m.name === 'Metformin') ||
-    medications[0];
-
-  const currentReminder = reminders.find((r) => r.medicationId === currentMed?.id);
-
-  // Check if there is an existing log for today
-  const existingLog = doseLogs.find((l) => l.medicationId === currentMed?.id);
-
-  // Local state for note and selectable side-effect chips
-  const [note, setNote] = useState<string>(existingLog?.note || '');
-  const [selectedSideEffects, setSelectedSideEffects] = useState<string[]>(
-    existingLog?.sideEffects && existingLog.sideEffects.length > 0
-      ? existingLog.sideEffects
-      : ['Nausea']
+  const currentMed = medications.find((med) => med.id === medId);
+  const currentReminder = reminders.find(
+    (reminder) => reminder.medicationId === currentMed?.id
   );
+  const existingLog = currentMed ? getTodayDoseLog(currentMed.id) : null;
+  const isEditing = Boolean(existingLog);
+
+  const [note, setNote] = useState(existingLog?.note || '');
+  const [selectedSideEffects, setSelectedSideEffects] = useState<string[]>(
+    existingLog?.sideEffects || []
+  );
+
+  useEffect(() => {
+    setNote(existingLog?.note || '');
+    setSelectedSideEffects(existingLog?.sideEffects || []);
+  }, [medId, existingLog?.id]);
+
+  const [actionError, setActionError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const toggleSideEffect = (effect: string) => {
     setSelectedSideEffects((prev) =>
-      prev.includes(effect) ? prev.filter((item) => item !== effect) : [...prev, effect]
+      prev.includes(effect)
+        ? prev.filter((item) => item !== effect)
+        : [...prev, effect]
     );
   };
 
@@ -54,31 +69,94 @@ export default function MarkAsTakenScreen() {
   };
 
   const handleDone = async () => {
-    if (currentMed) {
-      await markTaken(currentMed.id, {
-        note: note.trim(),
-        sideEffects: selectedSideEffects,
-      });
+    if (isSaving) return;
+
+    if (!currentMed) {
+      setActionError('Medication could not be found.');
+      return;
     }
-    // Done -> markTaken(id, note, sideEffects) then navigate to /medication-schedule
-    router.navigate({ pathname: '/medication-schedule' });
+
+    setActionError('');
+    setIsSaving(true);
+
+    try {
+      if (existingLog) {
+        await updateDoseLog(existingLog.id, {
+          note: note.trim(),
+          sideEffects: selectedSideEffects,
+        });
+      } else {
+        await markTaken(currentMed.id, {
+          note: note.trim(),
+          sideEffects: selectedSideEffects,
+          reminderId: currentReminder?.id,
+        });
+      }
+
+      router.navigate({ pathname: '/medication-schedule' });
+    } catch (error: unknown) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to save this dose. Please try again.'
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const performUndo = async () => {
+    if (isSaving) return;
+
+    if (!currentMed) {
+      setActionError('Medication could not be found.');
+      return;
+    }
+
+    setActionError('');
+    setIsSaving(true);
+
+    try {
+      if (!existingLog) {
+        throw new Error('There is no saved dose log to delete.');
+      }
+      await deleteDoseLog(existingLog.id);
+      router.navigate({ pathname: '/medication-schedule' });
+    } catch (error: unknown) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to undo this dose. Please try again.'
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleUndo = () => {
+    if (isSaving) return;
+
+    if (!existingLog) {
+      handleBack();
+      return;
+    }
+    if (Platform.OS === 'web') {
+      if (window.confirm('Delete this saved dose log?')) {
+        void performUndo();
+      }
+      return;
+    }
+
     Alert.alert(
-      'Undo Dose Logging',
-      'Are you sure you want to undo marking this dose as taken?',
+      'Delete Dose Log',
+      'Delete this saved dose log? Its notes and side effects will also be removed.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Undo',
+          text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            if (currentMed) {
-              await undoDoseLog(currentMed.id);
-            }
-            // Undo Action -> undo the log then navigate to /medication-schedule
-            router.navigate({ pathname: '/medication-schedule' });
+          onPress: () => {
+            void performUndo();
           },
         },
       ]
@@ -86,12 +164,19 @@ export default function MarkAsTakenScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      {/* Hide default header title & tabs */}
-      <Tabs.Screen options={{ tabBarStyle: { display: 'none' }, headerShown: false, title: '' }} />
+    <SafeAreaView
+      style={styles.safeArea}
+      edges={['top', 'left', 'right']}
+    >
+      <Tabs.Screen
+        options={{
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+          title: '',
+        }}
+      />
       <Stack.Screen options={{ headerShown: false, title: '' }} />
 
-      {/* Screen Header matching design */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.headerButton}
@@ -99,38 +184,43 @@ export default function MarkAsTakenScreen() {
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           activeOpacity={0.7}
           accessibilityLabel="Go back"
-          accessibilityRole="button">
+          accessibilityRole="button"
+        >
           <Ionicons name="chevron-back" size={24} color="#0F172A" />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>Mark as Taken</Text>
-
-        {/* Empty placeholder to balance back button and center title */}
+        <Text style={styles.headerTitle}>{isEditing ? 'Edit Dose Log' : 'Mark as Taken'}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.flexOne}>
+        style={styles.flexOne}
+      >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.wrapper}>
-            {/* Taken Successfully Green Banner */}
             <View style={styles.successBanner}>
               <View style={styles.checkCircle}>
-                <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+                <Ionicons name={isEditing ? "checkmark" : "pencil-outline"} size={20} color="#FFFFFF" />
               </View>
+
               <View style={styles.bannerTextContainer}>
-                <Text style={styles.bannerTitle}>Taken Successfully</Text>
-                <Text style={styles.bannerSubtitle}>Logged for today</Text>
+                <Text style={styles.bannerTitle}>
+                  {isEditing ? 'Saved Dose Log' : 'Confirm Your Dose'}
+                </Text>
+                <Text style={styles.bannerSubtitle}>
+                  {existingLog
+                    ? `${existingLog.status === 'taken' ? 'Taken' : 'Skipped'} at ${new Date(existingLog.takenAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Tap Done to save this dose'}
+                </Text>
               </View>
             </View>
 
-            {/* Medication Details Card */}
             <View style={styles.medCard}>
-              {/* Top row: Pill icon + Medication name + Dosage/form */}
               <View style={styles.medCardHeader}>
                 <View style={styles.pillIconContainer}>
                   <MaterialCommunityIcons
@@ -140,16 +230,19 @@ export default function MarkAsTakenScreen() {
                     style={styles.pillIcon}
                   />
                 </View>
+
                 <View style={styles.medInfo}>
-                  <Text style={styles.medName}>{currentMed?.name || 'Medication'}</Text>
-                  <Text style={styles.medDosage}>{currentMed?.dose || '10 mg • Tablet'}</Text>
+                  <Text style={styles.medName}>
+                    {currentMed?.name || 'Medication'}
+                  </Text>
+                  <Text style={styles.medDosage}>
+                    {currentMed?.dose || 'Dose unavailable'}
+                  </Text>
                 </View>
               </View>
 
-              {/* Subtle divider */}
               <View style={styles.cardDivider} />
 
-              {/* Bottom row: Scheduled time + Dose */}
               <View style={styles.medCardFooter}>
                 <View>
                   <Text style={styles.footerLabel}>SCHEDULED</Text>
@@ -157,8 +250,11 @@ export default function MarkAsTakenScreen() {
                     {currentReminder?.time || '08:00 AM'}
                   </Text>
                 </View>
+
                 <View style={styles.doseContainer}>
-                  <Text style={[styles.footerLabel, styles.alignRight]}>DOSE</Text>
+                  <Text style={[styles.footerLabel, styles.alignRight]}>
+                    DOSE
+                  </Text>
                   <Text style={[styles.footerValue, styles.alignRight]}>
                     {currentMed?.dose || '1 Dose'}
                   </Text>
@@ -166,41 +262,56 @@ export default function MarkAsTakenScreen() {
               </View>
             </View>
 
-            {/* Notes & Side Effects Section */}
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Notes & Side Effects</Text>
 
-              {/* Note Input */}
               <View style={styles.noteInputWrapper}>
-                <Ionicons name="pencil-outline" size={18} color="#64748B" style={styles.noteIcon} />
+                <Ionicons
+                  name="pencil-outline"
+                  size={18}
+                  color="#64748B"
+                  style={styles.noteIcon}
+                />
                 <TextInput
                   style={styles.noteInput}
                   placeholder="Add a note (optional)"
                   placeholderTextColor="#94A3B8"
                   value={note}
                   onChangeText={setNote}
+                  maxLength={200}
+                  editable={!isSaving}
                   returnKeyType="done"
                 />
               </View>
 
-              {/* Selectable Side Effect Chips */}
               <View style={styles.chipsRow}>
                 {AVAILABLE_SIDE_EFFECTS.map((effect) => {
                   const isSelected = selectedSideEffects.includes(effect);
+
                   return (
                     <TouchableOpacity
                       key={effect}
-                      style={[styles.chip, isSelected ? styles.chipSelected : styles.chipUnselected]}
+                      style={[
+                        styles.chip,
+                        isSelected
+                          ? styles.chipSelected
+                          : styles.chipUnselected,
+                      ]}
+                      disabled={isSaving}
                       onPress={() => toggleSideEffect(effect)}
                       activeOpacity={0.7}
                       accessibilityLabel={`Toggle side effect ${effect}`}
                       accessibilityRole="checkbox"
-                      accessibilityState={{ checked: isSelected }}>
+                      accessibilityState={{ checked: isSelected }}
+                    >
                       <Text
                         style={[
                           styles.chipText,
-                          isSelected ? styles.chipTextSelected : styles.chipTextUnselected,
-                        ]}>
+                          isSelected
+                            ? styles.chipTextSelected
+                            : styles.chipTextUnselected,
+                        ]}
+                      >
                         {effect}
                       </Text>
                     </TouchableOpacity>
@@ -211,25 +322,47 @@ export default function MarkAsTakenScreen() {
           </View>
         </ScrollView>
 
-        {/* Bottom Actions Container */}
-        <SafeAreaView edges={['bottom']} style={styles.bottomBarContainer}>
+        <SafeAreaView
+          edges={['bottom']}
+          style={styles.bottomBarContainer}
+        >
           <View style={styles.bottomBarWrapper}>
+            {actionError ? (
+              <Text style={styles.errorText} accessibilityRole="alert">
+                {actionError}
+              </Text>
+            ) : null}
+
             <TouchableOpacity
-              style={styles.doneButton}
+              style={[
+                styles.doneButton,
+                isSaving && styles.disabledButton,
+              ]}
               onPress={handleDone}
+              disabled={isSaving || !currentMed}
               activeOpacity={0.85}
-              accessibilityLabel="Done"
-              accessibilityRole="button">
-              <Text style={styles.doneButtonText}>Done</Text>
+              accessibilityLabel={isEditing ? "Save Changes" : "Done"}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isSaving }}
+            >
+              <Text style={styles.doneButtonText}>
+                {isSaving ? 'Please wait...' : isEditing ? 'Save Changes' : 'Done'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.undoButton}
+              style={[
+                styles.undoButton,
+                isSaving && styles.disabledButton,
+              ]}
               onPress={handleUndo}
+              disabled={isSaving}
               activeOpacity={0.7}
-              accessibilityLabel="Undo Action"
-              accessibilityRole="button">
-              <Text style={styles.undoButtonText}>Undo Action</Text>
+              accessibilityLabel={isEditing ? "Delete Dose Log" : "Cancel"}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isSaving }}
+            >
+              <Text style={styles.undoButtonText}>{isEditing ? 'Delete Dose Log' : 'Cancel'}</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -479,5 +612,13 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontSize: 15,
     fontWeight: '700',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 13,
+    marginBottom: 12,
   },
 });

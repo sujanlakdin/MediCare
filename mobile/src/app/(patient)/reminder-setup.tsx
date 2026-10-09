@@ -316,33 +316,44 @@ export default function ReminderSetupScreen() {
     }
   };
 
-  // Delete Reminder Handler
+  // Confirm deletion on both web and native platforms.
   const handleDeleteReminder = () => {
-    Alert.alert(
-      'Delete Reminder',
-      `Are you sure you want to delete the reminder for ${trimmedName || 'this medication'}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (existingReminder) {
-                await deleteReminder(existingReminder.id);
-              }
-              if (medId) {
-                await deleteMedication(medId);
-              }
-              // Delete -> navigate to /medication-schedule
-              router.navigate({ pathname: '/medication-schedule' });
-            } catch (err: any) {
-              setSaveErrorMessage(err?.message || 'Failed to delete reminder.');
-            }
-          },
-        },
-      ]
-    );
+    const message = `Delete ${trimmedName || 'this medication'}, all its reminders and its dose history?`;
+
+    const performDelete = async () => {
+      try {
+        setSaveErrorMessage('');
+        if (!medId || !existingMed) {
+          setSaveErrorMessage('Medication could not be found.');
+          return;
+        }
+        if (existingReminder) {
+          await deleteReminder(existingReminder.id);
+        }
+        await deleteMedication(medId);
+        router.navigate({ pathname: '/medication-schedule' });
+      } catch (err: unknown) {
+        setSaveErrorMessage(
+          err instanceof Error ? err.message : 'Failed to delete medication and reminders.'
+        );
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) {
+        void performDelete();
+      }
+      return;
+    }
+
+    Alert.alert('Delete Medication & Reminders', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => { void performDelete(); },
+      },
+    ]);
   };
 
   const handleHelpPress = () => {
@@ -581,7 +592,7 @@ export default function ReminderSetupScreen() {
               onPress={handleDeleteReminder}
               activeOpacity={0.8}>
               <Ionicons name="trash-outline" size={18} color="#DC2626" style={styles.deleteIcon} />
-              <Text style={styles.deleteButtonText}>Delete Reminder</Text>
+              <Text style={styles.deleteButtonText}>Delete Medication & Reminders</Text>
             </TouchableOpacity>
           )}
         </View>

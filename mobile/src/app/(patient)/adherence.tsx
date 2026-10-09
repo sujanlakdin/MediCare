@@ -28,7 +28,14 @@ export default function AdherenceScreen() {
     router.navigate({ pathname: '/medication-schedule' });
   };
 
+  const hasLogs = currentData.totalLogs > 0;
+
   const handleCalendar = () => {
+    const message = `Displaying recorded dose outcomes for the last ${selectedRange === '7d' ? 7 : 30} calendar days, including today.`;
+    if (Platform.OS === 'web') {
+      window.alert(message);
+      return;
+    }
     Alert.alert(
       'Date Range Selection',
       `Currently displaying adherence records for the ${
@@ -125,10 +132,18 @@ export default function AdherenceScreen() {
 
           {/* Overall Adherence Card */}
           <View style={styles.card}>
-            <Text style={styles.overallLabel}>OVERALL ADHERENCE</Text>
-            <Text style={styles.overallValue}>{currentData.overallPercentage}%</Text>
+            <Text style={styles.overallLabel}>RECORDED DOSE ADHERENCE</Text>
+            <Text style={styles.overallValue}>
+              {hasLogs ? `${currentData.overallPercentage}%` : 'No data'}
+            </Text>
+            <Text style={styles.explanation}>
+              {hasLogs
+                ? `${currentData.takenCount} taken out of ${currentData.totalLogs} recorded outcomes.`
+                : 'No dose outcomes recorded in this period.'}
+              {'\n'}Unlogged doses are not included.
+            </Text>
 
-            {/* Taken / Missed / Late Counts & Mini Progress Bars */}
+            {/* Taken / Missed / Skipped Counts & Mini Progress Bars */}
             <View style={styles.statusMetricsRow}>
               {/* Taken Metric */}
               <View style={styles.statusMetricCol}>
@@ -170,14 +185,14 @@ export default function AdherenceScreen() {
                 </View>
               </View>
 
-              {/* Late / Skipped Metric */}
+              {/* Skipped Metric */}
               <View style={styles.statusMetricCol}>
                 <View style={styles.miniBarTrack}>
                   <View
                     style={[
                       styles.miniBarFill,
                       {
-                        width: `${currentData.lateFill}%`,
+                        width: `${currentData.skippedFill}%`,
                         backgroundColor: '#F59E0B',
                       },
                     ]}
@@ -185,8 +200,8 @@ export default function AdherenceScreen() {
                 </View>
                 <View style={styles.metricLabelRow}>
                   <Ionicons name="time" size={13} color="#F59E0B" />
-                  <Text style={styles.metricName}>Late</Text>
-                  <Text style={styles.metricCount}>({currentData.lateCount})</Text>
+                  <Text style={styles.metricName}>Skipped</Text>
+                  <Text style={styles.metricCount}>({currentData.skippedCount})</Text>
                 </View>
               </View>
             </View>
@@ -194,7 +209,11 @@ export default function AdherenceScreen() {
 
           {/* Weekly Trend Bar Chart */}
           <View style={styles.card}>
-            <Text style={styles.cardHeading}>Weekly Trend</Text>
+            <Text style={styles.cardHeading}>Last 7 Days</Text>
+            <Text style={styles.explanation}>
+              Each bar shows taken doses as a percentage of that day's recorded outcomes.
+              No bar means no taken doses; a day may also have no records.
+            </Text>
             <View style={styles.chartArea}>
               <View style={styles.barsContainer}>
                 {currentData.weeklyTrend.map((item, index) => (
@@ -229,7 +248,7 @@ export default function AdherenceScreen() {
               <Ionicons name="flame" size={22} color="#FFFFFF" />
             </View>
             <View style={styles.streakTextContainer}>
-              <Text style={styles.streakTitle}>{currentData.streakDays} Day Streak!</Text>
+              <Text style={styles.streakTitle}>{currentData.streakDays} Day Recorded Streak</Text>
               <Text style={styles.streakSubtitle}>{currentData.streakMessage}</Text>
             </View>
           </View>
@@ -261,7 +280,7 @@ export default function AdherenceScreen() {
 
                 {/* Adherence Percentage */}
                 <Text style={[styles.medPercentageText, { color: med.color }]}>
-                  {med.percentage}%
+                  {currentData.medicationLogCounts[med.id] ? `${med.percentage}%` : 'No data'}
                 </Text>
               </View>
 
@@ -379,6 +398,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 6,
     elevation: 1.5,
+  },
+  explanation: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#64748B',
+    marginBottom: 14,
+    textAlign: 'center',
   },
   overallLabel: {
     fontSize: 12,
