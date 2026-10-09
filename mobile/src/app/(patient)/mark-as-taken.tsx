@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,9 @@ import { MaxContentWidth } from '@/constants/theme';
 import {
   useMedicareStore,
   markTaken,
-  undoDoseLog,
+  getTodayDoseLog,
+  updateDoseLog,
+  deleteDoseLog,
   goBackTo,
 } from '@/medicare';
 
@@ -32,27 +34,24 @@ export default function MarkAsTakenScreen() {
   }>();
   const medId = params.id || params.medicationId;
 
-  const { medications, reminders, doseLogs } = useMedicareStore();
+  const { medications, reminders } = useMedicareStore();
 
-  const currentMed =
-    medications.find((m) => m.id === medId) ||
-    medications.find((m) => m.name === 'Metformin') ||
-    medications[0];
-
+  const currentMed = medications.find((med) => med.id === medId);
   const currentReminder = reminders.find(
-    (r) => r.medicationId === currentMed?.id
+    (reminder) => reminder.medicationId === currentMed?.id
   );
+  const existingLog = currentMed ? getTodayDoseLog(currentMed.id) : null;
+  const isEditing = Boolean(existingLog);
 
-  const existingLog = doseLogs.find(
-    (l) => l.medicationId === currentMed?.id
-  );
-
-  const [note, setNote] = useState<string>(existingLog?.note || '');
+  const [note, setNote] = useState(existingLog?.note || '');
   const [selectedSideEffects, setSelectedSideEffects] = useState<string[]>(
-    existingLog?.sideEffects && existingLog.sideEffects.length > 0
-      ? existingLog.sideEffects
-      : ['Nausea']
+    existingLog?.sideEffects || []
   );
+
+  useEffect(() => {
+    setNote(existingLog?.note || '');
+    setSelectedSideEffects(existingLog?.sideEffects || []);
+  }, [medId, existingLog?.id]);
 
   const [actionError, setActionError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -81,10 +80,18 @@ export default function MarkAsTakenScreen() {
     setIsSaving(true);
 
     try {
-      await markTaken(currentMed.id, {
-        note: note.trim(),
-        sideEffects: selectedSideEffects,
-      });
+      if (existingLog) {
+        await updateDoseLog(existingLog.id, {
+          note: note.trim(),
+          sideEffects: selectedSideEffects,
+        });
+      } else {
+        await markTaken(currentMed.id, {
+          note: note.trim(),
+          sideEffects: selectedSideEffects,
+          reminderId: currentReminder?.id,
+        });
+      }
 
       router.navigate({ pathname: '/medication-schedule' });
     } catch (error: unknown) {
@@ -110,7 +117,10 @@ export default function MarkAsTakenScreen() {
     setIsSaving(true);
 
     try {
-      await undoDoseLog(currentMed.id);
+      if (!existingLog) {
+        throw new Error('There is no saved dose log to delete.');
+      }
+      await deleteDoseLog(existingLog.id);
       router.navigate({ pathname: '/medication-schedule' });
     } catch (error: unknown) {
       setActionError(
@@ -126,20 +136,24 @@ export default function MarkAsTakenScreen() {
   const handleUndo = () => {
     if (isSaving) return;
 
+    if (!existingLog) {
+      handleBack();
+      return;
+    }
     if (Platform.OS === 'web') {
-      if (window.confirm('Undo marking this dose as taken?')) {
+      if (window.confirm('Delete this saved dose log?')) {
         void performUndo();
       }
       return;
     }
 
     Alert.alert(
-      'Undo Dose Logging',
-      'Are you sure you want to undo marking this dose as taken?',
+      'Delete Dose Log',
+      'Delete this saved dose log? Its notes and side effects will also be removed.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Undo',
+          text: 'Delete',
           style: 'destructive',
           onPress: () => {
             void performUndo();
@@ -175,7 +189,7 @@ export default function MarkAsTakenScreen() {
           <Ionicons name="chevron-back" size={24} color="#0F172A" />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>Mark as Taken</Text>
+        <Text style={styles.headerTitle}>{isEditing ? 'Edit Dose Log' : 'Mark as Taken'}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -191,12 +205,18 @@ export default function MarkAsTakenScreen() {
           <View style={styles.wrapper}>
             <View style={styles.successBanner}>
               <View style={styles.checkCircle}>
-                <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+                <Ionicons name={isEditing ? "checkmark" : "pencil-outline"} size={20} color="#FFFFFF" />
               </View>
 
               <View style={styles.bannerTextContainer}>
-                <Text style={styles.bannerTitle}>Taken Successfully</Text>
-                <Text style={styles.bannerSubtitle}>Logged for today</Text>
+                <Text style={styles.bannerTitle}>
+                  {isEditing ? 'Saved Dose Log' : 'Confirm Your Dose'}
+                </Text>
+                <Text style={styles.bannerSubtitle}>
+                  {existingLog
+                    ? `${existingLog.status === 'taken' ? 'Taken' : 'Skipped'} at ${new Date(existingLog.takenAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Tap Done to save this dose'}
+                </Text>
               </View>
             </View>
 
@@ -216,7 +236,7 @@ export default function MarkAsTakenScreen() {
                     {currentMed?.name || 'Medication'}
                   </Text>
                   <Text style={styles.medDosage}>
-                    {currentMed?.dose || '10 mg • Tablet'}
+                    {currentMed?.dose || 'Dose unavailable'}
                   </Text>
                 </View>
               </View>
@@ -258,6 +278,8 @@ export default function MarkAsTakenScreen() {
                   placeholderTextColor="#94A3B8"
                   value={note}
                   onChangeText={setNote}
+                  maxLength={200}
+                  editable={!isSaving}
                   returnKeyType="done"
                 />
               </View>
@@ -275,6 +297,7 @@ export default function MarkAsTakenScreen() {
                           ? styles.chipSelected
                           : styles.chipUnselected,
                       ]}
+                      disabled={isSaving}
                       onPress={() => toggleSideEffect(effect)}
                       activeOpacity={0.7}
                       accessibilityLabel={`Toggle side effect ${effect}`}
@@ -316,14 +339,14 @@ export default function MarkAsTakenScreen() {
                 isSaving && styles.disabledButton,
               ]}
               onPress={handleDone}
-              disabled={isSaving}
+              disabled={isSaving || !currentMed}
               activeOpacity={0.85}
-              accessibilityLabel="Done"
+              accessibilityLabel={isEditing ? "Save Changes" : "Done"}
               accessibilityRole="button"
               accessibilityState={{ disabled: isSaving }}
             >
               <Text style={styles.doneButtonText}>
-                {isSaving ? 'Please wait...' : 'Done'}
+                {isSaving ? 'Please wait...' : isEditing ? 'Save Changes' : 'Done'}
               </Text>
             </TouchableOpacity>
 
@@ -335,11 +358,11 @@ export default function MarkAsTakenScreen() {
               onPress={handleUndo}
               disabled={isSaving}
               activeOpacity={0.7}
-              accessibilityLabel="Undo Action"
+              accessibilityLabel={isEditing ? "Delete Dose Log" : "Cancel"}
               accessibilityRole="button"
               accessibilityState={{ disabled: isSaving }}
             >
-              <Text style={styles.undoButtonText}>Undo Action</Text>
+              <Text style={styles.undoButtonText}>{isEditing ? 'Delete Dose Log' : 'Cancel'}</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>

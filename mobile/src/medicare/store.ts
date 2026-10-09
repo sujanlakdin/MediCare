@@ -385,6 +385,49 @@ export async function undoDoseLog(
   return removed;
 }
 
+export function getTodayDoseLog(medicationId: string): DoseLog | null {
+  const today = getLocalDateKey();
+  const found = doseLogs.find(
+    (log) => log.medicationId === medicationId && isLogOnDate(log.takenAt, today)
+  );
+  return found ? { ...found, sideEffects: [...(found.sideEffects || [])] } : null;
+}
+
+// Edit details without changing the recorded dose time or status.
+export async function updateDoseLog(
+  id: string,
+  updates: { note?: string; sideEffects?: string[] }
+): Promise<DoseLog> {
+  const index = doseLogs.findIndex((log) => log.id === id);
+  if (index === -1) throw new Error('Dose log not found.');
+  if (updates.note !== undefined &&
+      (typeof updates.note !== 'string' || updates.note.length > 200)) {
+    throw new Error('Note must be 200 characters or less.');
+  }
+  if (updates.sideEffects !== undefined &&
+      (!Array.isArray(updates.sideEffects) ||
+       updates.sideEffects.some((effect) => typeof effect !== 'string'))) {
+    throw new Error('Side effects must be text entries.');
+  }
+  const updated: DoseLog = {
+    ...doseLogs[index],
+    ...(updates.note !== undefined ? { note: updates.note.trim() } : {}),
+    ...(updates.sideEffects !== undefined
+      ? { sideEffects: [...updates.sideEffects] } : {}),
+  };
+  doseLogs = doseLogs.map((log, i) => i === index ? updated : log);
+  notifyListeners();
+  return { ...updated, sideEffects: [...(updated.sideEffects || [])] };
+}
+
+export async function deleteDoseLog(id: string): Promise<boolean> {
+  const found = doseLogs.some((log) => log.id === id);
+  if (!found) throw new Error('Dose log not found.');
+  doseLogs = doseLogs.filter((log) => log.id !== id);
+  notifyListeners();
+  return true;
+}
+
 export async function snoozeReminder(
   reminderId: string,
   _minutes = 15

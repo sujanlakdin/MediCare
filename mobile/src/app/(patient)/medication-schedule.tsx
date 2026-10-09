@@ -122,7 +122,7 @@ export default function MedicationScheduleScreen() {
             {item.name}
           </Text>
           <Text style={styles.medDetails}>
-            {item.dosage} • {item.instructions}
+            {item.dosage} â€¢ {item.instructions}
           </Text>
 
           {/* Status Row */}
@@ -165,6 +165,20 @@ export default function MedicationScheduleScreen() {
             <Text style={styles.nextText}>{item.nextTime}</Text>
           </View>
         </View>
+
+        {(isTaken || isSkipped) && (
+          <TouchableOpacity
+            style={styles.logButton}
+            onPress={(event) => {
+              event.stopPropagation();
+              handleLogPress(item);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Edit dose log for ${item.name}`}
+            activeOpacity={0.75}>
+            <Text style={styles.logButtonText}>Edit log</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Action Button for due soon items */}
         {isDueSoon && (
