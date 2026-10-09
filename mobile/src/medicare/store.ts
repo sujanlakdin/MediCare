@@ -1,3 +1,4 @@
+import { calculateAdherence, type AdherenceStats } from './adherence-calculations';
 import { useState, useEffect } from 'react';
 import {
   Medication,
@@ -5,7 +6,6 @@ import {
   DoseLog,
   ScheduleItem,
   TimeOfDayGroup,
-  PeriodData,
 } from './types';
 import {
   INITIAL_MEDICATIONS,
@@ -520,124 +520,13 @@ export function computeScheduleItems(): ScheduleItem[] {
 }
 
 // ---------------------------------------------------------------------------
-// 5. Existing Adherence Calculation
-// Chart, streak and range filtering still require a separate update.
+// 5. Adherence from recorded dose outcomes
 // ---------------------------------------------------------------------------
 
 export function computeAdherenceStats(
   range: '7d' | '30d'
-): PeriodData {
-  let takenCount = 0;
-  let missedCount = 0;
-  let lateCount = 0;
-
-  doseLogs.forEach((log) => {
-    if (log.status === 'taken') {
-      takenCount++;
-    } else if (log.status === 'missed') {
-      missedCount++;
-    } else if (log.status === 'skipped') {
-      lateCount++;
-    }
-  });
-
-  const totalDoses = takenCount + missedCount + lateCount;
-
-  const overallPercentage =
-    totalDoses > 0
-      ? Math.round((takenCount / totalDoses) * 100)
-      : 100;
-
-  const takenFill =
-    totalDoses > 0
-      ? Math.round((takenCount / totalDoses) * 100)
-      : 100;
-
-  const missedFill =
-    totalDoses > 0
-      ? Math.round((missedCount / totalDoses) * 100)
-      : 0;
-
-  const lateFill =
-    totalDoses > 0
-      ? Math.round((lateCount / totalDoses) * 100)
-      : 0;
-
-  // Existing demo values; not yet calculated from dated logs.
-  const streakDays = range === '7d' ? 5 : 12;
-
-  const streakMessage =
-    overallPercentage >= 80
-      ? range === '7d'
-        ? "You're on track. Keep it up!"
-        : 'Outstanding consistency this month!'
-      : 'Keep taking your doses to build your streak!';
-
-  const weeklyTrend = [
-    { day: 'M', height: 50, color: '#DCF5E9' },
-    { day: 'T', height: 72, color: '#DCF5E9' },
-    { day: 'W', height: 38, color: '#FEE2E2' },
-    { day: 'T', height: 95, color: '#2BB673', isCurrent: true },
-    { day: 'F', height: 62, color: '#DCF5E9' },
-    { day: 'S', height: 74, color: '#DCF5E9' },
-    { day: 'S', height: 86, color: '#DCF5E9' },
-  ];
-
-  const medicationBreakdown = medications.map((med) => {
-    const medLogs = doseLogs.filter(
-      (log) => log.medicationId === med.id
-    );
-
-    const medTaken = medLogs.filter(
-      (log) => log.status === 'taken'
-    ).length;
-
-    const medTotal = medLogs.length;
-
-    const percentage =
-      medTotal > 0
-        ? Math.round((medTaken / medTotal) * 100)
-        : 100;
-
-    const reminder = reminders.find(
-      (item) => item.medicationId === med.id
-    );
-
-    const periodGroup = reminder
-      ? getTimeOfDayGroup(reminder.time)
-      : 'MORNING';
-
-    const periodName =
-      periodGroup.charAt(0) +
-      periodGroup.slice(1).toLowerCase();
-
-    const isGood = percentage >= 80;
-
-    return {
-      id: med.id,
-      name: med.name,
-      dosage: med.dose,
-      period: periodName,
-      percentage,
-      color: isGood ? '#2BB673' : '#EF4444',
-      bgColor: isGood ? '#E6F4EE' : '#FEE2E2',
-      trackColor: isGood ? '#E6F4EE' : '#FEE2E2',
-    };
-  });
-
-  return {
-    overallPercentage,
-    takenCount,
-    missedCount,
-    lateCount,
-    takenFill,
-    missedFill,
-    lateFill,
-    streakDays,
-    streakMessage,
-    weeklyTrend,
-    medications: medicationBreakdown,
-  };
+): AdherenceStats {
+  return calculateAdherence(medications, reminders, doseLogs, range);
 }
 
 // ---------------------------------------------------------------------------
