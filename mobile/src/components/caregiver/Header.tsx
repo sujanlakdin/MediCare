@@ -13,7 +13,7 @@ interface CaregiverHeaderProps {
 }
 
 export function CaregiverHeader({
-  caregiverName = 'Kasun',
+  caregiverName = 'Caregiver',
   avatarUrl = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
   subtext = "Here's Eleanor's medication update",
   notificationCount = 1,

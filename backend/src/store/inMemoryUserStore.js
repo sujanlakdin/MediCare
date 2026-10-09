@@ -102,6 +102,13 @@ const inMemoryUserStore = {
       dateOfBirth: data.dateOfBirth || "",
       gender: data.gender || "",
       bloodGroup: data.bloodGroup || "O+",
+      primaryDiagnosis: data.primaryDiagnosis || "General Monitoring",
+      allergies: data.allergies || "None recorded",
+      vitals: data.vitals || {
+        bloodPressure: "120/80",
+        heartRate: 75,
+        bloodSugar: 115,
+      },
       address: data.address || data.residentialAddress || "",
       residentialAddress: data.residentialAddress || data.address || "",
       medicalId: data.medicalId || `MED-${Math.floor(10000 + Math.random() * 90000)}`,

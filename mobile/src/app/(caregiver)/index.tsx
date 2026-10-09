@@ -25,6 +25,10 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    if (user) {
+      caregiverProfileStore.syncFromUser(user);
+    }
+    setCaregiverProfile(caregiverProfileStore.getProfile());
     loadInitialData();
     const unsubscribe = caregiverProfileStore.subscribe((updated) => {
       setCaregiverProfile(updated);

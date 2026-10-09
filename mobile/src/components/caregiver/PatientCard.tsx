@@ -38,7 +38,13 @@ export function PatientCard({
     <>
       <Pressable style={styles.cardContainer} onPress={handleCardPress}>
         <View style={styles.leftRow}>
-          <Image source={{ uri: avatarUri }} style={styles.patientAvatar} />
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.patientAvatar} />
+          ) : (
+            <View style={[styles.patientAvatar, styles.avatarPlaceholder]}>
+              <Text style={styles.avatarInitial}>{patientName ? patientName.charAt(0).toUpperCase() : 'P'}</Text>
+            </View>
+          )}
           <View style={styles.infoCol}>
             <View style={styles.nameRow}>
               <Text style={styles.patientName}>{patientName}</Text>
@@ -100,12 +106,16 @@ export function PatientCard({
                           setModalVisible(false);
                         }}>
                         <View style={styles.patientOptionLeft}>
-                          <Image
-                            source={{
-                              uri: item.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
-                            }}
-                            style={styles.modalAvatar}
-                          />
+                          {item.avatarUrl ? (
+                            <Image
+                              source={{ uri: item.avatarUrl }}
+                              style={styles.modalAvatar}
+                            />
+                          ) : (
+                            <View style={[styles.modalAvatar, styles.modalAvatarPlaceholder]}>
+                              <Text style={styles.modalAvatarInitial}>{item.name ? item.name.charAt(0).toUpperCase() : 'P'}</Text>
+                            </View>
+                          )}
                           <View style={{ flex: 1 }}>
                             <Text style={[styles.optionName, isSelected && styles.optionNameSelected]}>
                               {item.name}
@@ -293,6 +303,30 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: '#E2E8F0',
+  },
+  avatarPlaceholder: {
+    backgroundColor: '#E8F2EC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.light.primary,
+  },
+  avatarInitial: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.light.primary,
+  },
+  modalAvatarPlaceholder: {
+    backgroundColor: '#E8F2EC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.light.primary,
+  },
+  modalAvatarInitial: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.light.primary,
   },
   modalClinicalSnippet: {
     marginTop: 6,

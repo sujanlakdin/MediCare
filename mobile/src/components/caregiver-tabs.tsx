@@ -15,9 +15,9 @@ export default function CaregiverTabs() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E2E8F0',
-          height: Platform.OS === 'ios' ? 88 : 72,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 12,
-          paddingTop: 8,
+          height: Platform.OS === 'ios' ? 88 : Platform.OS === 'web' ? 76 : 68,
+          paddingBottom: Platform.OS === 'ios' ? 24 : Platform.OS === 'web' ? 8 : 6,
+          paddingTop: 6,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -4 },
           shadowOpacity: 0.06,
@@ -25,12 +25,15 @@ export default function CaregiverTabs() {
           elevation: 10,
         },
         tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
           paddingVertical: 2,
         },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',
-          marginTop: 2,
+          marginTop: 1,
+          marginBottom: 2,
         },
       }}>
       <Tabs.Screen

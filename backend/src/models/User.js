@@ -43,6 +43,13 @@ const userSchema = new mongoose.Schema(
     dateOfBirth: { type: String, default: "" },
     gender: { type: String, default: "", trim: true, maxlength: 60 },
     bloodGroup: { type: String, default: "O+", trim: true, maxlength: 10 },
+    primaryDiagnosis: { type: String, default: "General Monitoring", trim: true, maxlength: 200 },
+    allergies: { type: String, default: "None recorded", trim: true, maxlength: 200 },
+    vitals: {
+      bloodPressure: { type: String, default: "120/80" },
+      heartRate: { type: Number, default: 75 },
+      bloodSugar: { type: Number, default: 115 },
+    },
     address: { type: String, default: "", trim: true, maxlength: 300 },
     profilePhotoUrl: { type: String, default: "", trim: true },
     notificationSettings: { type: notificationSettingsSchema, default: () => ({}) },

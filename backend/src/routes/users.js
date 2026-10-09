@@ -210,6 +210,19 @@ router.put("/profile", async (req, res) => {
   if (Object.prototype.hasOwnProperty.call(body, "bloodGroup") && body.bloodGroup) {
     updates.bloodGroup = readString(body.bloodGroup, "Blood group", { required: false, maxLength: 10 });
   }
+  if (Object.prototype.hasOwnProperty.call(body, "primaryDiagnosis") && body.primaryDiagnosis) {
+    updates.primaryDiagnosis = readString(body.primaryDiagnosis, "Primary diagnosis", { required: false, maxLength: 200 });
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "allergies") && body.allergies) {
+    updates.allergies = readString(body.allergies, "Allergies", { required: false, maxLength: 200 });
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "vitals") && typeof body.vitals === "object" && body.vitals !== null) {
+    updates.vitals = {
+      bloodPressure: readString(body.vitals.bloodPressure || "120/80", "Blood pressure", { required: false, maxLength: 20 }),
+      heartRate: Number(body.vitals.heartRate) || 75,
+      bloodSugar: Number(body.vitals.bloodSugar) || 115,
+    };
+  }
   if (Object.prototype.hasOwnProperty.call(body, "address")) {
     updates.address = readString(body.address, "Address", { required: false, maxLength: 300 });
   }

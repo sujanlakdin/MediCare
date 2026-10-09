@@ -13,7 +13,7 @@ import { caregiverProfileStore } from '@/services/caregiverProfileStore';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, signOut, switchRole } = useAuth();
+  const { user, signOut, switchRole, updateUser } = useAuth();
 
   const [missedAlerts, setMissedAlerts] = useState(true);
   const [refillReminders, setRefillReminders] = useState(true);
@@ -43,12 +43,16 @@ export default function ProfileScreen() {
   );
 
   useEffect(() => {
+    if (user) {
+      caregiverProfileStore.syncFromUser(user);
+    }
+    setCaregiverProfile(caregiverProfileStore.getProfile());
     loadPatients();
     const unsubscribe = caregiverProfileStore.subscribe((updated) => {
       setCaregiverProfile(updated);
     });
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   const loadPatients = async () => {
     try {
@@ -386,6 +390,13 @@ export default function ProfileScreen() {
         onSave={(updatedData) => {
           setCaregiverProfile(updatedData);
           caregiverProfileStore.updateProfile(updatedData);
+          if (updateUser) {
+            updateUser({
+              fullName: updatedData.name,
+              email: updatedData.email,
+              phone: updatedData.phone,
+            });
+          }
         }}
         onDelete={() => {
           const defaultData = {
