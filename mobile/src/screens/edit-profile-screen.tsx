@@ -1,5 +1,5 @@
 import { router, type Href } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -14,6 +14,9 @@ import { useAccessibility } from '@/contexts/accessibility-context';
 import { useAuth } from '@/contexts/auth-context';
 import { ApiError } from '@/services/api';
 import { getProfile, updateProfile } from '@/services/medicare-api';
+
+type ProfileField = 'fullName' | 'age' | 'phone' | 'email' | 'address';
+type ProfileFieldErrors = Partial<Record<ProfileField, string>>;
 
 export default function EditProfileScreen() {
   const { token } = useAuth();
@@ -30,6 +33,8 @@ export default function EditProfileScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<ProfileFieldErrors>({});
+  const savingRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -73,47 +78,70 @@ export default function EditProfileScreen() {
     };
   }, [token]);
 
+  function handleFieldChange(field: ProfileField, value: string) {
+    if (field === 'fullName') setFullName(value);
+    if (field === 'age') setAge(value);
+    if (field === 'phone') setPhone(value);
+    if (field === 'email') setEmail(value);
+    if (field === 'address') setAddress(value);
+    const validationError = getProfileFieldError(field, value);
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      if (validationError) return { ...current, [field]: validationError };
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
   async function handleSave() {
-    if (!fullName.trim()) {
-      setError('Please enter your full name.');
-      return;
+    if (savingRef.current) return;
+
+    const trimmedName = fullName.trim();
+    const trimmedAge = age.trim();
+    const trimmedPhone = phone.trim();
+    const trimmedEmail = email.trim();
+    const trimmedAddress = address.trim();
+    const nextErrors: ProfileFieldErrors = {};
+
+    for (const field of ['fullName', 'age', 'phone', 'email', 'address'] as const) {
+      const value = field === 'fullName'
+        ? trimmedName
+        : field === 'age'
+          ? trimmedAge
+          : field === 'phone'
+            ? trimmedPhone
+            : field === 'email'
+              ? trimmedEmail
+              : trimmedAddress;
+      const validationError = getProfileFieldError(field, value);
+      if (validationError) nextErrors[field] = validationError;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError('Please enter a valid email address.');
-      return;
-    }
-    if (age.trim() && (!/^\d+$/.test(age.trim()) || Number(age) < 1 || Number(age) > 125)) {
-      setError('Please enter a valid age between 1 and 125.');
-      return;
-    }
-    if (phone.trim() && !isValidPhone(phone)) {
-      setError('Please enter a valid phone number.');
-      return;
-    }
-    if (address.trim().length > 300) {
-      setError('Residential address must be 300 characters or fewer.');
-      return;
-    }
+    setFieldErrors(nextErrors);
+    setError('');
+    if (Object.keys(nextErrors).length > 0) return;
+
     if (!token) {
       setError('Please sign in to update your profile.');
       return;
     }
 
     setIsSaving(true);
+    savingRef.current = true;
     setError('');
 
     // Compute date of birth from age
-    const numericAge = Number(age.trim());
-    const dateOfBirth = age.trim()
+    const numericAge = Number(trimmedAge);
+    const dateOfBirth = trimmedAge
       ? `${new Date().getFullYear() - numericAge}-01-01`
       : '';
 
     try {
       await updateProfile(token, {
-        fullName: fullName.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        address: address.trim(),
+        fullName: trimmedName,
+        email: trimmedEmail,
+        phone: trimmedPhone,
+        address: trimmedAddress,
         dateOfBirth,
       });
       router.replace('/(app)/(tabs)/profile' as Href);
@@ -124,6 +152,7 @@ export default function EditProfileScreen() {
           : 'Unable to update profile. Please try again.'
       );
     } finally {
+      savingRef.current = false;
       setIsSaving(false);
     }
   }
@@ -147,11 +176,12 @@ export default function EditProfileScreen() {
             <TextInput
               style={[styles.input, settings.largerButtons && styles.largeInput]}
               value={fullName}
-              onChangeText={setFullName}
+              onChangeText={(value) => handleFieldChange('fullName', value)}
               placeholder="Full Name"
               placeholderTextColor="#9CB0A6"
               autoComplete="name"
             />
+            {fieldErrors.fullName ? <Text style={styles.fieldErrorText}>{fieldErrors.fullName}</Text> : null}
           </View>
 
           {/* AGE */}
@@ -160,11 +190,12 @@ export default function EditProfileScreen() {
             <TextInput
               style={[styles.input, settings.largerButtons && styles.largeInput]}
               value={age}
-              onChangeText={setAge}
+              onChangeText={(value) => handleFieldChange('age', value)}
               placeholder="Age"
               placeholderTextColor="#9CB0A6"
               keyboardType="number-pad"
             />
+            {fieldErrors.age ? <Text style={styles.fieldErrorText}>{fieldErrors.age}</Text> : null}
           </View>
 
           {/* PHONE NUMBER */}
@@ -173,11 +204,12 @@ export default function EditProfileScreen() {
             <TextInput
               style={[styles.input, settings.largerButtons && styles.largeInput]}
               value={phone}
-              onChangeText={setPhone}
+              onChangeText={(value) => handleFieldChange('phone', value)}
               placeholder="Phone Number"
               placeholderTextColor="#9CB0A6"
               keyboardType="phone-pad"
             />
+            {fieldErrors.phone ? <Text style={styles.fieldErrorText}>{fieldErrors.phone}</Text> : null}
           </View>
 
           {/* EMAIL ADDRESS */}
@@ -186,13 +218,14 @@ export default function EditProfileScreen() {
             <TextInput
               style={[styles.input, settings.largerButtons && styles.largeInput]}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(value) => handleFieldChange('email', value)}
               placeholder="Email Address"
               placeholderTextColor="#9CB0A6"
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
             />
+            {fieldErrors.email ? <Text style={styles.fieldErrorText}>{fieldErrors.email}</Text> : null}
           </View>
 
           {/* RESIDENTIAL ADDRESS */}
@@ -205,12 +238,13 @@ export default function EditProfileScreen() {
                 settings.largerButtons && styles.largeTextArea,
               ]}
               value={address}
-              onChangeText={setAddress}
+              onChangeText={(value) => handleFieldChange('address', value)}
               placeholder="Residential Address"
               placeholderTextColor="#9CB0A6"
               multiline
               numberOfLines={2}
             />
+            {fieldErrors.address ? <Text style={styles.fieldErrorText}>{fieldErrors.address}</Text> : null}
           </View>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -253,10 +287,40 @@ export default function EditProfileScreen() {
   );
 }
 
-function isValidPhone(value: string) {
-  const phone = value.trim();
-  const digits = phone.replace(/\D/g, '');
-  return /^\+?[\d().\s-]+$/.test(phone) && digits.length >= 7 && digits.length <= 15;
+function getProfileFieldError(field: ProfileField, value: string) {
+  const trimmedValue = value.trim();
+  if (field === 'fullName') {
+    if (!trimmedValue) return 'Enter your full name.';
+    if (trimmedValue.length > 120 || !/^[\p{L}\p{M}][\p{L}\p{M}\s.'’-]*$/u.test(trimmedValue)) {
+      return 'Enter a valid name (up to 120 characters; letters, spaces, apostrophes, periods, or hyphens).';
+    }
+  }
+  if (field === 'email') {
+    if (!trimmedValue) return 'Enter your email address.';
+    if (trimmedValue.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedValue)) {
+      return 'Enter a valid email address (up to 254 characters).';
+    }
+  }
+  if (field === 'age' && trimmedValue && (
+    !/^\d+$/.test(trimmedValue) || Number(trimmedValue) < 1 || Number(trimmedValue) > 125
+  )) {
+    return 'Enter a whole-number age between 1 and 125, or leave it blank.';
+  }
+  if (field === 'phone' && trimmedValue) {
+    const digits = trimmedValue.replace(/\D/g, '');
+    if (
+      trimmedValue.length > 30 ||
+      !/^\+?[\d().\s-]+$/.test(trimmedValue) ||
+      digits.length < 7 ||
+      digits.length > 15
+    ) {
+      return 'Enter a valid phone number with 7–15 digits, or leave it blank.';
+    }
+  }
+  if (field === 'address' && trimmedValue.length > 300) {
+    return 'Residential address must be 300 characters or fewer.';
+  }
+  return '';
 }
 
 const styles = StyleSheet.create({
@@ -308,6 +372,11 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#D32F2F',
     fontSize: 13,
+    fontWeight: '500',
+  },
+  fieldErrorText: {
+    color: '#D32F2F',
+    fontSize: 12,
     fontWeight: '500',
   },
   buttonGroup: {

@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -20,6 +20,9 @@ import {
   updateCaregiver,
 } from '@/services/medicare-api';
 
+type CaregiverField = 'name' | 'relationship' | 'phone' | 'email';
+type CaregiverFieldErrors = Partial<Record<CaregiverField, string>>;
+
 export default function AddCaregiverScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { token } = useAuth();
@@ -32,15 +35,18 @@ export default function AddCaregiverScreen() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<CaregiverFieldErrors>({});
+  const savingRef = useRef(false);
 
   useFocusEffect(useCallback(() => {
     let active = true;
     setIsLoading(true);
-    setError('');
+    setFormError('');
+    setFieldErrors({});
 
     if (!token) {
-      setError('Please sign in to manage caregiver details.');
+      setFormError('Please sign in to manage caregiver details.');
       setIsLoading(false);
       return () => {
         active = false;
@@ -53,24 +59,18 @@ export default function AddCaregiverScreen() {
         if (id) {
           const found = caregivers.find((item) => item._id === id);
           if (!found) {
-            setError('Caregiver not found. Please return and refresh the caregiver list.');
+            setFormError('Caregiver not found. Please return and refresh the caregiver list.');
           } else {
             setName(found.name);
             setPhone(found.phone);
             setRelationship(found.relationship);
             setEmail(found.email || '');
           }
-        } else if (caregivers.length > 0) {
-          Alert.alert(
-            'Caregiver already registered',
-            'Your existing caregiver details are available on the Caregiver and Emergency page.',
-            [{ text: 'OK', onPress: () => router.replace('/settings/caregivers' as Href) }]
-          );
         }
       })
       .catch((requestError: unknown) => {
         if (active) {
-          setError(
+          setFormError(
             requestError instanceof ApiError
               ? requestError.message
               : 'Unable to load caregiver details. Please try again.'
@@ -85,46 +85,70 @@ export default function AddCaregiverScreen() {
     };
   }, [id, token]));
 
+  function handleFieldChange(field: CaregiverField, value: string) {
+    if (field === 'name') setName(value);
+    if (field === 'relationship') setRelationship(value);
+    if (field === 'phone') setPhone(value);
+    if (field === 'email') setEmail(value);
+    const validationError = getCaregiverFieldError(field, value);
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      if (validationError) return { ...current, [field]: validationError };
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
   async function handleSave() {
-    if (!name.trim()) {
-      setError('Please enter the caregiver’s full name.');
-      return;
+    if (savingRef.current) return;
+
+    const trimmedName = name.trim();
+    const trimmedRelationship = relationship.trim();
+    const trimmedPhone = phone.trim();
+    const trimmedEmail = email.trim();
+    const nextErrors: CaregiverFieldErrors = {};
+
+    for (const field of ['name', 'relationship', 'phone', 'email'] as const) {
+      const value = field === 'name'
+        ? trimmedName
+        : field === 'relationship'
+          ? trimmedRelationship
+          : field === 'phone'
+            ? trimmedPhone
+            : trimmedEmail;
+      const validationError = getCaregiverFieldError(field, value);
+      if (validationError) nextErrors[field] = validationError;
     }
-    if (!relationship.trim()) {
-      setError('Please enter the caregiver’s relationship to you.');
-      return;
-    }
-    if (!isValidPhone(phone)) {
-      setError('Please enter a valid caregiver phone number.');
-      return;
-    }
-    if (email.trim() && !isValidEmail(email.trim())) {
-      setError('Please enter a valid caregiver email address.');
+    setFieldErrors(nextErrors);
+    setFormError('');
+
+    if (Object.keys(nextErrors).length > 0) {
       return;
     }
 
     if (!token) {
-      setError('Please sign in to save caregiver details.');
+      setFormError('Please sign in to save caregiver details.');
       return;
     }
 
     setIsSaving(true);
-    setError('');
+    savingRef.current = true;
 
     try {
       if (id) {
         await updateCaregiver(token, id, {
-          name: name.trim(),
-          phone: phone.trim(),
-          relationship: relationship.trim(),
-          email: email.trim(),
+          name: trimmedName,
+          phone: trimmedPhone,
+          relationship: trimmedRelationship,
+          email: trimmedEmail,
         });
       } else {
         await createCaregiver(token, {
-          name: name.trim(),
-          phone: phone.trim(),
-          relationship: relationship.trim(),
-          email: email.trim(),
+          name: trimmedName,
+          phone: trimmedPhone,
+          relationship: trimmedRelationship,
+          email: trimmedEmail,
           isPrimary: true,
           medicationAlerts: true,
           missedMedicationAlerts: true,
@@ -136,12 +160,13 @@ export default function AddCaregiverScreen() {
         [{ text: 'OK', onPress: () => router.replace('/settings/caregivers' as Href) }]
       );
     } catch (err) {
-      setError(
+      setFormError(
         err instanceof ApiError
           ? err.message
           : 'Unable to save caregiver. Please try again.'
       );
     } finally {
+      savingRef.current = false;
       setIsSaving(false);
     }
   }
@@ -166,11 +191,12 @@ export default function AddCaregiverScreen() {
             <TextInput
               style={[styles.input, a11y.largerButtons && styles.largeInput]}
               value={name}
-              onChangeText={setName}
+              onChangeText={(value) => handleFieldChange('name', value)}
               placeholder="Full Name"
               placeholderTextColor="#9CB0A6"
               autoComplete="name"
             />
+            {fieldErrors.name ? <Text style={styles.fieldErrorText}>{fieldErrors.name}</Text> : null}
           </View>
 
           {/* PHONE NUMBER */}
@@ -179,11 +205,12 @@ export default function AddCaregiverScreen() {
             <TextInput
               style={[styles.input, a11y.largerButtons && styles.largeInput]}
               value={phone}
-              onChangeText={setPhone}
+              onChangeText={(value) => handleFieldChange('phone', value)}
               placeholder="Phone Number"
               placeholderTextColor="#9CB0A6"
               keyboardType="phone-pad"
             />
+            {fieldErrors.phone ? <Text style={styles.fieldErrorText}>{fieldErrors.phone}</Text> : null}
           </View>
 
           {/* RELATIONSHIP */}
@@ -192,10 +219,11 @@ export default function AddCaregiverScreen() {
             <TextInput
               style={[styles.input, a11y.largerButtons && styles.largeInput]}
               value={relationship}
-              onChangeText={setRelationship}
+              onChangeText={(value) => handleFieldChange('relationship', value)}
               placeholder="Relationship (e.g. Daughter, Spouse)"
               placeholderTextColor="#9CB0A6"
             />
+            {fieldErrors.relationship ? <Text style={styles.fieldErrorText}>{fieldErrors.relationship}</Text> : null}
           </View>
 
           <View style={styles.fieldWrapper}>
@@ -203,13 +231,14 @@ export default function AddCaregiverScreen() {
             <TextInput
               style={[styles.input, a11y.largerButtons && styles.largeInput]}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(value) => handleFieldChange('email', value)}
               placeholder="Email Address"
               placeholderTextColor="#9CB0A6"
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
             />
+            {fieldErrors.email ? <Text style={styles.fieldErrorText}>{fieldErrors.email}</Text> : null}
           </View>
 
           {/* Info Notice Box */}
@@ -220,7 +249,7 @@ export default function AddCaregiverScreen() {
             </Text>
           </View>
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
 
           {/* Buttons */}
           <View style={styles.buttonGroup}>
@@ -317,6 +346,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
+  fieldErrorText: {
+    color: '#D32F2F',
+    fontSize: 12,
+    fontWeight: '500',
+  },
   buttonGroup: {
     gap: 10,
     marginTop: 8,
@@ -367,12 +401,33 @@ const styles = StyleSheet.create({
   },
 });
 
-function isValidPhone(value: string) {
-  const phone = value.trim();
-  const digits = phone.replace(/\D/g, '');
-  return /^\+?[\d().\s-]+$/.test(phone) && digits.length >= 7 && digits.length <= 15;
-}
-
-function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+function getCaregiverFieldError(field: CaregiverField, value: string) {
+  const trimmedValue = value.trim();
+  if (field === 'name') {
+    if (!trimmedValue) return 'Enter the caregiver’s full name.';
+    if (trimmedValue.length > 120 || !/^[\p{L}\p{M}][\p{L}\p{M}\s.'’-]*$/u.test(trimmedValue)) {
+      return 'Enter a valid name (up to 120 characters; letters, spaces, apostrophes, periods, or hyphens).';
+    }
+  }
+  if (field === 'relationship') {
+    if (!trimmedValue) return 'Enter the caregiver’s relationship to you.';
+    if (trimmedValue.length > 80) return 'Relationship must be 80 characters or fewer.';
+  }
+  if (field === 'phone') {
+    const digits = trimmedValue.replace(/\D/g, '');
+    if (
+      trimmedValue.length > 30 ||
+      !/^\+?[\d().\s-]+$/.test(trimmedValue) ||
+      digits.length < 7 ||
+      digits.length > 15
+    ) {
+      return 'Enter a valid phone number with 7–15 digits.';
+    }
+  }
+  if (field === 'email' && trimmedValue && (
+    trimmedValue.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedValue)
+  )) {
+    return 'Enter a valid email address (up to 254 characters).';
+  }
+  return '';
 }

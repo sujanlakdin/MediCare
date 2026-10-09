@@ -29,10 +29,10 @@ export default function CaregiverSettingsScreen() {
   const { token } = useAuth();
   const { settings: a11y } = useAccessibility();
 
-  const [caregiver, setCaregiver] = useState<Caregiver | null>(null);
+  const [caregivers, setCaregivers] = useState<Caregiver[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [caregiverError, setCaregiverError] = useState('');
-  const [isRemoving, setIsRemoving] = useState(false);
+  const [removingCaregiverId, setRemovingCaregiverId] = useState<string | null>(null);
   const [isUpdatingAlerts, setIsUpdatingAlerts] = useState(false);
   const [sosSent, setSosSent] = useState(false);
 
@@ -41,37 +41,37 @@ export default function CaregiverSettingsScreen() {
     setCaregiverError('');
 
     if (!token) {
-      setCaregiver(null);
+      setCaregivers([]);
       setCaregiverError('Please sign in to manage caregiver details.');
       setIsLoading(false);
       return;
     }
 
     try {
-      const { caregivers } = await getCaregivers(token);
-      setCaregiver(caregivers.find((item) => item.isPrimary) || caregivers[0] || null);
+      const result = await getCaregivers(token);
+      setCaregivers(result.caregivers);
     } catch (requestError) {
-      setCaregiver(null);
+      setCaregivers([]);
       setCaregiverError(
         requestError instanceof ApiError
           ? requestError.message
           : 'Unable to load caregiver details. Please try again.'
       );
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   }, [token]);
 
   useFocusEffect(useCallback(() => {
     void loadDetails();
   }, [loadDetails]));
 
-  async function executeRemove() {
-    if (!token || !caregiver) {
+  async function executeRemove(caregiver: Caregiver) {
+    if (!token) {
       setCaregiverError('Please sign in to remove caregiver details.');
       return;
     }
-    setIsRemoving(true);
+    setRemovingCaregiverId(caregiver._id);
     try {
       await removeCaregiver(token, caregiver._id);
       await loadDetails();
@@ -84,33 +84,34 @@ export default function CaregiverSettingsScreen() {
           : 'Unable to remove caregiver. Please try again.'
       );
     } finally {
-      setIsRemoving(false);
+      setRemovingCaregiverId(null);
     }
   }
 
-  function handleRemove() {
-    if (!caregiver) return;
+  function handleRemove(caregiver: Caregiver) {
     const message = `Are you sure you want to remove ${caregiver.name}?`;
 
     if (Platform.OS === 'web') {
       if (typeof window !== 'undefined' && window.confirm(message)) {
-        void executeRemove();
+        void executeRemove(caregiver);
       }
       return;
     }
 
     Alert.alert('Remove Caregiver?', message, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => void executeRemove() },
+      { text: 'Remove', style: 'destructive', onPress: () => void executeRemove(caregiver) },
     ]);
   }
 
-  async function handleAlertChange(field: 'missedMedicationAlerts' | 'medicationAlerts', value: boolean) {
-    if (!token || !caregiver) return;
+  async function handleAlertChange(caregiver: Caregiver, field: 'missedMedicationAlerts' | 'medicationAlerts', value: boolean) {
+    if (!token) return;
     setIsUpdatingAlerts(true);
     try {
       const result = await updateCaregiver(token, caregiver._id, { [field]: value });
-      setCaregiver(result.caregiver);
+      setCaregivers((current) => current.map((item) =>
+        item._id === result.caregiver._id ? result.caregiver : item
+      ));
     } catch (requestError) {
       Alert.alert(
         'Unable to update alerts',
@@ -140,10 +141,14 @@ export default function CaregiverSettingsScreen() {
     setSosSent(true);
     Alert.alert(
       'SOS Alert Sent',
-      `Emergency SMS and push alert dispatched to ${caregiver?.name || 'your caregiver'}.`
+      `Emergency SMS and push alert dispatched to ${
+        caregivers.find((item) => item.isPrimary)?.name || caregivers[0]?.name || 'your caregiver'
+      }.`
     );
     setTimeout(() => setSosSent(false), 4000);
   }
+
+  const notificationCaregiver = caregivers.find((item) => item.isPrimary) || caregivers[0] || null;
 
   return (
     <Screen
@@ -162,7 +167,7 @@ export default function CaregiverSettingsScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
               <Text style={styles.cardHeader}>Linked Caregiver</Text>
-              {caregiver ? (
+              {caregivers.length > 0 ? (
                 <View style={styles.syncBadge}>
                   <View style={styles.greenDot} />
                   <Text style={styles.syncBadgeText}>SYNC ACTIVE</Text>
@@ -181,8 +186,13 @@ export default function CaregiverSettingsScreen() {
                 </Pressable>
               </>
             ) : null}
-            {caregiver ? (
-              <>
+            {caregivers.length === 0 && !caregiverError ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No linked caregiver currently configured.</Text>
+              </View>
+            ) : null}
+            {caregivers.map((caregiver) => (
+              <View key={caregiver._id} style={styles.caregiverEntry}>
                 <View style={styles.caregiverInfoRow}>
                   <View style={styles.avatarWrapper}>
                     <Image
@@ -198,6 +208,9 @@ export default function CaregiverSettingsScreen() {
                     {caregiver.email ? (
                       <Text style={styles.caregiverSubtext}>{caregiver.email}</Text>
                     ) : null}
+                    {caregiver.isPrimary ? (
+                      <Text style={styles.caregiverSubtext}>Primary caregiver</Text>
+                    ) : null}
                   </View>
                 </View>
                 <View style={styles.actionButtonsRow}>
@@ -208,7 +221,7 @@ export default function CaregiverSettingsScreen() {
                       router.push({
                         pathname: '/settings/add-caregiver',
                         params: { id: caregiver._id },
-                      } as unknown as Href)
+                      } as Href)
                     }
                     style={({ pressed }) => [
                       styles.actionBtn,
@@ -221,16 +234,16 @@ export default function CaregiverSettingsScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Remove Caregiver"
-                    disabled={isRemoving}
-                    onPress={handleRemove}
+                    disabled={removingCaregiverId !== null}
+                    onPress={() => handleRemove(caregiver)}
                     style={({ pressed }) => [
                       styles.actionBtn,
                       styles.removeBtn,
                       a11y.largerButtons && styles.largeActionBtn,
                       pressed && styles.pressed,
-                      isRemoving && styles.disabled,
+                      removingCaregiverId !== null && styles.disabled,
                     ]}>
-                    {isRemoving ? (
+                    {removingCaregiverId === caregiver._id ? (
                       <ActivityIndicator size="small" color="#D32F2F" />
                     ) : (
                       <>
@@ -240,32 +253,30 @@ export default function CaregiverSettingsScreen() {
                     )}
                   </Pressable>
                 </View>
-              </>
-            ) : caregiverError ? null : (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No linked caregiver currently configured.</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => router.push('/settings/add-caregiver' as Href)}
-                  style={styles.addBtn}>
-                  <Text style={styles.addBtnText}>+ Add a Caregiver</Text>
-                </Pressable>
               </View>
-            )}
+            ))}
+            {!caregiverError ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/settings/add-caregiver' as Href)}
+                style={styles.addBtn}>
+                <Text style={styles.addBtnText}>+ Add a Caregiver</Text>
+              </Pressable>
+            ) : null}
           </View>
 
           <View style={styles.card}>
             <Text style={styles.cardHeader}>
-              Notifications Sent to {caregiver ? caregiver.name.split(' ')[0] : 'Caregiver'}
+              Notifications Sent to {notificationCaregiver ? notificationCaregiver.name.split(' ')[0] : 'Caregiver'}
             </Text>
             <View style={styles.row}>
               <View style={styles.copy}>
                 <Text style={styles.itemTitle}>Missed-Dose SMS Alerts</Text>
               </View>
               <Switch
-                value={caregiver?.missedMedicationAlerts ?? true}
-                onValueChange={(value) => void handleAlertChange('missedMedicationAlerts', value)}
-                disabled={!caregiver || isUpdatingAlerts}
+                value={notificationCaregiver?.missedMedicationAlerts ?? true}
+                onValueChange={(value) => notificationCaregiver && void handleAlertChange(notificationCaregiver, 'missedMedicationAlerts', value)}
+                disabled={!notificationCaregiver || isUpdatingAlerts}
                 trackColor={{ true: '#22996E', false: '#D9E3DE' }}
                 thumbColor="#FFFFFF"
                 accessibilityLabel="Missed-Dose SMS Alerts"
@@ -277,9 +288,9 @@ export default function CaregiverSettingsScreen() {
                 <Text style={styles.itemTitle}>Daily Adherence Summary</Text>
               </View>
               <Switch
-                value={caregiver?.medicationAlerts ?? true}
-                onValueChange={(value) => void handleAlertChange('medicationAlerts', value)}
-                disabled={!caregiver || isUpdatingAlerts}
+                value={notificationCaregiver?.medicationAlerts ?? true}
+                onValueChange={(value) => notificationCaregiver && void handleAlertChange(notificationCaregiver, 'medicationAlerts', value)}
+                disabled={!notificationCaregiver || isUpdatingAlerts}
                 trackColor={{ true: '#22996E', false: '#D9E3DE' }}
                 thumbColor="#FFFFFF"
                 accessibilityLabel="Daily Adherence Summary"
@@ -392,6 +403,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingVertical: 2,
+  },
+  caregiverEntry: {
+    gap: 12,
   },
   avatarWrapper: {
     width: 52,
