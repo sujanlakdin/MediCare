@@ -122,7 +122,7 @@ export default function MedicationScheduleScreen() {
             {item.name}
           </Text>
           <Text style={styles.medDetails}>
-            {item.dosage} â€¢ {item.instructions}
+            {item.dosage} {'\u2022'} {item.instructions}
           </Text>
 
           {/* Status Row */}
@@ -310,7 +310,7 @@ export default function MedicationScheduleScreen() {
         </View>
       </ScrollView>
 
-      <PatientBottomNav currentTab="home" />
+      <PatientBottomNav currentTab="reminders" />
     </SafeAreaView>
   );
 }
