@@ -1,6 +1,7 @@
-import { router, useLocalSearchParams, type Href } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
+  Alert,
   ActivityIndicator,
   Pressable,
   StyleSheet,
@@ -24,38 +25,86 @@ export default function AddCaregiverScreen() {
   const { token } = useAuth();
   const { settings: a11y } = useAccessibility();
 
-  const [name, setName] = useState('Amara Rajapakse');
-  const [phone, setPhone] = useState('+94 77 987 6543');
-  const [relationship, setRelationship] = useState('Daughter');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [relationship, setRelationship] = useState('');
+  const [email, setEmail] = useState('');
 
-  const [isLoading, setIsLoading] = useState(Boolean(id));
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!id || !token) return;
+  useFocusEffect(useCallback(() => {
     let active = true;
+    setIsLoading(true);
+    setError('');
+
+    if (!token) {
+      setError('Please sign in to manage caregiver details.');
+      setIsLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
     void getCaregivers(token)
       .then(({ caregivers }) => {
-        const found = caregivers.find((item) => item._id === id);
-        if (found && active) {
-          setName(found.name);
-          setPhone(found.phone);
-          setRelationship(found.relationship);
+        if (!active) return;
+        if (id) {
+          const found = caregivers.find((item) => item._id === id);
+          if (!found) {
+            setError('Caregiver not found. Please return and refresh the caregiver list.');
+          } else {
+            setName(found.name);
+            setPhone(found.phone);
+            setRelationship(found.relationship);
+            setEmail(found.email || '');
+          }
+        } else if (caregivers.length > 0) {
+          Alert.alert(
+            'Caregiver already registered',
+            'Your existing caregiver details are available on the Caregiver and Emergency page.',
+            [{ text: 'OK', onPress: () => router.replace('/settings/caregivers' as Href) }]
+          );
         }
       })
-      .catch(() => undefined)
+      .catch((requestError: unknown) => {
+        if (active) {
+          setError(
+            requestError instanceof ApiError
+              ? requestError.message
+              : 'Unable to load caregiver details. Please try again.'
+          );
+        }
+      })
       .finally(() => {
         if (active) setIsLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [id, token]);
+  }, [id, token]));
 
   async function handleSave() {
-    if (!name.trim() || !phone.trim() || !relationship.trim()) {
-      setError('Please provide a name, phone number, and relationship.');
+    if (!name.trim()) {
+      setError('Please enter the caregiver’s full name.');
+      return;
+    }
+    if (!relationship.trim()) {
+      setError('Please enter the caregiver’s relationship to you.');
+      return;
+    }
+    if (!isValidPhone(phone)) {
+      setError('Please enter a valid caregiver phone number.');
+      return;
+    }
+    if (email.trim() && !isValidEmail(email.trim())) {
+      setError('Please enter a valid caregiver email address.');
+      return;
+    }
+
+    if (!token) {
+      setError('Please sign in to save caregiver details.');
       return;
     }
 
@@ -63,26 +112,29 @@ export default function AddCaregiverScreen() {
     setError('');
 
     try {
-      if (token) {
-        if (id) {
-          await updateCaregiver(token, id, {
-            name: name.trim(),
-            phone: phone.trim(),
-            relationship: relationship.trim(),
-          });
-        } else {
-          await createCaregiver(token, {
-            name: name.trim(),
-            phone: phone.trim(),
-            relationship: relationship.trim(),
-            email: '',
-            isPrimary: true,
-            medicationAlerts: true,
-            missedMedicationAlerts: true,
-          });
-        }
+      if (id) {
+        await updateCaregiver(token, id, {
+          name: name.trim(),
+          phone: phone.trim(),
+          relationship: relationship.trim(),
+          email: email.trim(),
+        });
+      } else {
+        await createCaregiver(token, {
+          name: name.trim(),
+          phone: phone.trim(),
+          relationship: relationship.trim(),
+          email: email.trim(),
+          isPrimary: true,
+          medicationAlerts: true,
+          missedMedicationAlerts: true,
+        });
       }
-      router.replace('/settings/caregivers' as Href);
+      Alert.alert(
+        'Caregiver saved',
+        'Caregiver details have been saved successfully.',
+        [{ text: 'OK', onPress: () => router.replace('/settings/caregivers' as Href) }]
+      );
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -143,6 +195,20 @@ export default function AddCaregiverScreen() {
               onChangeText={setRelationship}
               placeholder="Relationship (e.g. Daughter, Spouse)"
               placeholderTextColor="#9CB0A6"
+            />
+          </View>
+
+          <View style={styles.fieldWrapper}>
+            <Text style={styles.fieldLabel}>EMAIL (OPTIONAL)</Text>
+            <TextInput
+              style={[styles.input, a11y.largerButtons && styles.largeInput]}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Email Address"
+              placeholderTextColor="#9CB0A6"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
             />
           </View>
 
@@ -300,3 +366,13 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
 });
+
+function isValidPhone(value: string) {
+  const phone = value.trim();
+  const digits = phone.replace(/\D/g, '');
+  return /^\+?[\d().\s-]+$/.test(phone) && digits.length >= 7 && digits.length <= 15;
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}

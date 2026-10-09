@@ -1,5 +1,5 @@
 import { router, type Href } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -31,38 +31,71 @@ export default function EditProfileScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const loadProfile = useCallback(async () => {
+  useEffect(() => {
+    let active = true;
     if (!token) {
-      setIsLoading(false);
-      return;
+      void Promise.resolve().then(() => {
+        if (!active) return;
+        setError('Please sign in to update your profile.');
+        setIsLoading(false);
+      });
+      return () => {
+        active = false;
+      };
     }
-    try {
-      const result = await getProfile(token);
-      const p = result.profile;
-      if (p.fullName) setFullName(p.fullName);
-      if (p.email) setEmail(p.email);
-      if (p.phone) setPhone(p.phone);
-      if (p.address) setAddress(p.address);
-      if (p.dateOfBirth) {
-        const year = parseInt(p.dateOfBirth.split('-')[0], 10);
-        if (!isNaN(year)) {
-          setAge(String(2026 - year));
+
+    void getProfile(token)
+      .then(({ profile: p }) => {
+        if (!active) return;
+        if (p.fullName) setFullName(p.fullName);
+        if (p.email) setEmail(p.email);
+        if (p.phone) setPhone(p.phone);
+        if (p.address) setAddress(p.address);
+        if (p.dateOfBirth) {
+          const year = parseInt(p.dateOfBirth.split('-')[0], 10);
+          if (!isNaN(year)) setAge(String(new Date().getFullYear() - year));
         }
-      }
-    } catch {
-      // Keep defaults
-    } finally {
-      setIsLoading(false);
-    }
+      })
+      .catch((requestError: unknown) => {
+        if (!active) return;
+        setError(
+          requestError instanceof ApiError
+            ? requestError.message
+            : 'Unable to load profile details. Please try again.'
+        );
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [token]);
 
-  useEffect(() => {
-    void loadProfile();
-  }, []);
-
   async function handleSave() {
-    if (!fullName.trim() || !email.trim()) {
-      setError('Please enter your full name and a valid email address.');
+    if (!fullName.trim()) {
+      setError('Please enter your full name.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    if (age.trim() && (!/^\d+$/.test(age.trim()) || Number(age) < 1 || Number(age) > 125)) {
+      setError('Please enter a valid age between 1 and 125.');
+      return;
+    }
+    if (phone.trim() && !isValidPhone(phone)) {
+      setError('Please enter a valid phone number.');
+      return;
+    }
+    if (address.trim().length > 300) {
+      setError('Residential address must be 300 characters or fewer.');
+      return;
+    }
+    if (!token) {
+      setError('Please sign in to update your profile.');
       return;
     }
 
@@ -70,20 +103,19 @@ export default function EditProfileScreen() {
     setError('');
 
     // Compute date of birth from age
-    const numericAge = parseInt(age.trim(), 10);
-    const birthYear = !isNaN(numericAge) && numericAge > 0 ? 2026 - numericAge : 1954;
-    const dateOfBirth = `${birthYear}-01-01`;
+    const numericAge = Number(age.trim());
+    const dateOfBirth = age.trim()
+      ? `${new Date().getFullYear() - numericAge}-01-01`
+      : '';
 
     try {
-      if (token) {
-        await updateProfile(token, {
-          fullName: fullName.trim(),
-          email: email.trim(),
-          phone: phone.trim(),
-          address: address.trim(),
-          dateOfBirth,
-        });
-      }
+      await updateProfile(token, {
+        fullName: fullName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        dateOfBirth,
+      });
       router.replace('/(app)/(tabs)/profile' as Href);
     } catch (err) {
       setError(
@@ -219,6 +251,12 @@ export default function EditProfileScreen() {
       )}
     </Screen>
   );
+}
+
+function isValidPhone(value: string) {
+  const phone = value.trim();
+  const digits = phone.replace(/\D/g, '');
+  return /^\+?[\d().\s-]+$/.test(phone) && digits.length >= 7 && digits.length <= 15;
 }
 
 const styles = StyleSheet.create({
