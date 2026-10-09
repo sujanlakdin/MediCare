@@ -682,7 +682,7 @@ function recordDose(
         (status === 'skipped'
           ? 'Skipped dose'
           : existing?.status === 'taken'
-            ? existing.note
+            ? existing.note ?? ''
             : ''),
       sideEffects: options?.sideEffects ??
         (status === 'taken' ? existing?.sideEffects || [] : []),
@@ -696,7 +696,7 @@ function recordDose(
           captured.token
         )
       : await doseLogApi.create(
-          { medicationId, ...payload },
+          { medicationId, ...payload, note: payload.note ?? '' },
           captured.token
         );
 
