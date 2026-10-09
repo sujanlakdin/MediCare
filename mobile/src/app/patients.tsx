@@ -171,6 +171,7 @@ export default function PatientsScreen() {
           ) : (
             /* Medication List View */
             <MedicationList
+              patientId={selectedPatient?._id}
               onAddMedication={() => alert('Add Medication dialog opened!')}
               onEditSchedule={(med) => alert(`Edit schedule for ${med.name}`)}
             />

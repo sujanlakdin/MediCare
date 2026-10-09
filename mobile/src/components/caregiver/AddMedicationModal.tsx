@@ -22,6 +22,7 @@ interface AddMedicationModalProps {
   onSuccess: () => void;
   initialData?: MedicationItem | null;
   isEditMode?: boolean;
+  patientId?: string;
 }
 
 export const AddMedicationModal: React.FC<AddMedicationModalProps> = ({
@@ -30,6 +31,7 @@ export const AddMedicationModal: React.FC<AddMedicationModalProps> = ({
   onSuccess,
   initialData,
   isEditMode = false,
+  patientId,
 }) => {
   const [name, setName] = useState('');
   const [purpose, setPurpose] = useState('');
@@ -105,6 +107,7 @@ export const AddMedicationModal: React.FC<AddMedicationModalProps> = ({
         });
       } else {
         await medicationApi.addMedication({
+          patientId,
           name: name.trim(),
           purpose: purpose.trim(),
           dosage: finalDosage,
@@ -264,24 +267,38 @@ export const AddMedicationModal: React.FC<AddMedicationModalProps> = ({
             {/* Frequency */}
             <Text style={styles.label}>Frequency</Text>
             <View style={styles.frequencyRow}>
-              {['Daily', 'Twice daily', 'Weekly', 'As needed'].map((item) => (
+              {[
+                { label: 'Daily (1x)', val: 'Daily', time: '08:00 AM' },
+                { label: 'Twice daily (2x)', val: 'Twice daily', time: '08:00 AM, 08:00 PM' },
+                { label: '3 times daily (3x)', val: '3 times daily', time: '08:00 AM, 04:00 PM, 12:00 AM' },
+                { label: 'Weekly', val: 'Weekly', time: '08:00 AM' },
+                { label: 'As needed', val: 'As needed', time: 'As needed' },
+              ].map((item) => (
                 <TouchableOpacity
-                  key={item}
+                  key={item.val}
                   style={[
                     styles.freqChip,
-                    frequency === item && styles.freqChipActive,
+                    frequency === item.val && styles.freqChipActive,
                   ]}
-                  onPress={() => setFrequency(item)}>
+                  onPress={() => {
+                    setFrequency(item.val);
+                    if (!isEditMode) {
+                      setScheduledTime(item.time);
+                    }
+                  }}>
                   <Text
                     style={[
                       styles.freqText,
-                      frequency === item && styles.freqTextActive,
+                      frequency === item.val && styles.freqTextActive,
                     ]}>
-                    {item}
+                    {item.label}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
+            <Text style={{ fontSize: 11, color: Colors.light.textSecondary, marginTop: 4 }}>
+              * For multiple doses per day (e.g. 3 times daily 8-hr interval), enter times separated by commas.
+            </Text>
 
             {/* Instructions */}
             <Text style={styles.label}>Instructions</Text>

@@ -1,29 +1,3 @@
-const dns = require("dns");
-try {
-  dns.setServers(["8.8.8.8", "1.1.1.1"]);
-  if (dns.setDefaultResultOrder) dns.setDefaultResultOrder("ipv4first");
-} catch {}
-
-const origLookup = dns.lookup;
-dns.lookup = (hostname, options, callback) => {
-  if (typeof options === "function") {
-    callback = options;
-    options = {};
-  }
-  origLookup(hostname, options, (err, address, family) => {
-    if (err && hostname && hostname.includes("mongodb.net")) {
-      dns.resolve4(hostname, (resErr, addresses) => {
-        if (!resErr && addresses?.length) {
-          return callback(null, addresses[0], 4);
-        }
-        callback(err, address, family);
-      });
-    } else {
-      callback(err, address, family);
-    }
-  });
-};
-
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
@@ -53,6 +27,22 @@ app.use("/api/users", authenticate, userRoutes);
 app.use("/api/caregivers", authenticate, caregiverRoutes);
 app.use("/api/support", authenticate, supportRoutes);
 
+// Additional API Routes
+const profileRoutes = require("./routes/profileRoutes");
+const medicationRoutes = require("./routes/medicationRoutes");
+const patientRoutes = require("./routes/patientRoutes");
+const reminderRoutes = require("./routes/reminderRoutes");
+const doseLogRoutes = require("./routes/doseLogRoutes");
+const noteRoutes = require("./routes/noteRoutes");
+
+app.use("/api/profile", authenticate, profileRoutes);
+app.use("/api/medications", authenticate, medicationRoutes);
+app.use("/api/patients", patientRoutes);
+app.use("/api/reminders", authenticate, reminderRoutes);
+app.use("/api/dose-logs", authenticate, doseLogRoutes);
+app.use("/api/notes", noteRoutes);
+
+// Error Handling Middleware (must be after all routes)
 app.use((error, _req, res, _next) => {
   const status = error.statusCode || 500;
   let message = error.message || "An unexpected server error occurred.";
@@ -65,37 +55,37 @@ app.use((error, _req, res, _next) => {
   res.status(status).json({ error: message });
 });
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("MongoDB connected successfully!");
-  })
-  .catch((error) => {
-    console.error("MongoDB connection error:", error.message);
-    if (error.message && error.message.includes("ECONNREFUSED")) {
-      console.warn("\n[Tip] MongoDB is not running on 127.0.0.1:27017.");
-      console.warn("  1. If installed locally, start the service in an Admin terminal: `net start MongoDB` or run `mongod`");
-      console.warn("  2. If using MongoDB Atlas (cloud), update MONGO_URI in `backend/.env`:\n     MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/medicare?retryWrites=true&w=majority\n");
-    }
-  });
-
-// API Routes
-const profileRoutes = require("./routes/profileRoutes");
-const medicationRoutes = require("./routes/medicationRoutes");
-const patientRoutes = require("./routes/patientRoutes");
-
-app.use("/api/profile", authenticate, profileRoutes);
-app.use("/api/medications", authenticate, medicationRoutes);
-app.use("/api/patients", patientRoutes);
-
 app.get("/", (req, res) => {
   res.json({
     message: "MediCare Backend is running!",
   });
 });
 
+// Connect to MongoDB
+const primaryUri = process.env.MONGO_URI || "mongodb+srv://medicare_admin:LyTdfo6vGwXFSOT8@cluster0.swmcvu7.mongodb.net/medicare?retryWrites=true&w=majority&appName=Cluster0";
+const localUri = "mongodb://127.0.0.1:27017/medicare";
+
+mongoose
+  .connect(primaryUri, { serverSelectionTimeoutMS: 5000 })
+  .then(() => {
+    console.log("🟢 MongoDB connected successfully (Atlas Cloud)!");
+  })
+  .catch((error) => {
+    console.warn("⚠️ Cloud MongoDB Atlas connection failed/timed out:", error.message);
+    console.log("🔄 Attempting fallback to local MongoDB...");
+    mongoose
+      .connect(localUri, { serverSelectionTimeoutMS: 3000 })
+      .then(() => {
+        console.log("🟢 MongoDB connected successfully (Local Database)!");
+      })
+      .catch((localErr) => {
+        console.error("🔴 Local MongoDB also unavailable:", localErr.message);
+        console.log("💡 Application will use in-memory state fallback for requests.");
+      });
+  });
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

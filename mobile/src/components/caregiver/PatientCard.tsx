@@ -90,38 +90,52 @@ export function PatientCard({
               renderItem={({ item }) => {
                 const isSelected = item._id === selectedPatientId || item.name === patientName;
                 return (
-                  <TouchableOpacity
-                    style={[styles.patientOption, isSelected && styles.patientOptionSelected]}
-                    onPress={() => {
-                      if (onSelectPatient) {
-                        onSelectPatient(item);
-                      }
-                      setModalVisible(false);
-                    }}>
-                    <View style={styles.patientOptionLeft}>
-                      <View style={styles.optionAvatarContainer}>
-                        <Ionicons
-                          name="person-circle-outline"
-                          size={36}
-                          color={isSelected ? Colors.light.primary : Colors.light.textSecondary}
-                        />
-                      </View>
-                      <View>
-                        <Text style={[styles.optionName, isSelected && styles.optionNameSelected]}>
-                          {item.name}
+                    <View style={{ flex: 1 }}>
+                      <TouchableOpacity
+                        style={[styles.patientOption, isSelected && styles.patientOptionSelected]}
+                        onPress={() => {
+                          if (onSelectPatient) {
+                            onSelectPatient(item);
+                          }
+                          setModalVisible(false);
+                        }}>
+                        <View style={styles.patientOptionLeft}>
+                          <Image
+                            source={{
+                              uri: item.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
+                            }}
+                            style={styles.modalAvatar}
+                          />
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.optionName, isSelected && styles.optionNameSelected]}>
+                              {item.name}
+                            </Text>
+                            <Text style={styles.optionSub}>
+                              Age {item.age} • {item.bloodGroup ? `Blood ${item.bloodGroup}` : 'Patient'}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {isSelected ? (
+                          <Ionicons name="checkmark-circle" size={24} color={Colors.light.primary} />
+                        ) : (
+                          <Ionicons name="chevron-forward" size={20} color={Colors.light.textSecondary} />
+                        )}
+                      </TouchableOpacity>
+
+                      {/* Clinical info snippet in modal */}
+                      <View style={styles.modalClinicalSnippet}>
+                        <Text style={styles.modalDiagnosisText}>
+                          🩺 <Text style={{ fontWeight: '700' }}>Diagnosis:</Text> {item.primaryDiagnosis || 'Hypertension'}
                         </Text>
-                        <Text style={styles.optionSub}>
-                          Age {item.age} • Phone: {item.phone || 'N/A'}
+                        <Text style={styles.modalAllergyText}>
+                          ⚠️ <Text style={{ fontWeight: '700' }}>Allergies:</Text> {item.allergies || 'Penicillin'}
+                        </Text>
+                        <Text style={styles.modalVitalsText}>
+                          💓 <Text style={{ fontWeight: '700' }}>BP / HR:</Text> {item.vitals?.bloodPressure || '128/82'} mmHg | {item.vitals?.heartRate || 72} bpm
                         </Text>
                       </View>
                     </View>
-
-                    {isSelected ? (
-                      <Ionicons name="checkmark-circle" size={24} color={Colors.light.primary} />
-                    ) : (
-                      <Ionicons name="chevron-forward" size={20} color={Colors.light.textSecondary} />
-                    )}
-                  </TouchableOpacity>
                 );
               }}
             />
@@ -273,5 +287,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.light.textSecondary,
     marginTop: 2,
+  },
+  modalAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E2E8F0',
+  },
+  modalClinicalSnippet: {
+    marginTop: 6,
+    paddingLeft: 52,
+    gap: 3,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalDiagnosisText: {
+    fontSize: 11,
+    color: '#0284C7',
+  },
+  modalAllergyText: {
+    fontSize: 11,
+    color: '#DC2626',
+  },
+  modalVitalsText: {
+    fontSize: 11,
+    color: Colors.light.textSecondary,
   },
 });

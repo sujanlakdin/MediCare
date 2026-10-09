@@ -40,14 +40,14 @@ export default function MainMenuScreen() {
       title: 'Schedule',
       subtitle: 'Morning, noon & evening checklists',
       icon: 'reports',
-      onPress: () => router.push('/settings/notifications' as Href),
+      onPress: () => router.push('/(patient)/medication-schedule' as Href),
     },
     {
       id: 'adherence',
       title: 'Adherence',
       subtitle: 'Adherence performance & progress metrics',
       icon: 'reports',
-      onPress: () => router.push('/(patient)/dashboard' as Href),
+      onPress: () => router.push('/(patient)/adherence' as Href),
     },
     {
       id: 'caregiver',

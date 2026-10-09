@@ -6,6 +6,7 @@ let localMeds = [
   {
     _id: "66f000000000000000000001",
     id: "66f000000000000000000001",
+    patientId: "650000000000000000000001",
     name: "Lisinopril 10mg",
     purpose: "Blood pressure",
     form: "Tablet",
@@ -24,6 +25,7 @@ let localMeds = [
   {
     _id: "66f000000000000000000002",
     id: "66f000000000000000000002",
+    patientId: "650000000000000000000001",
     name: "Atorvastatin 20mg",
     purpose: "Cholesterol",
     form: "Tablet",
@@ -41,7 +43,8 @@ let localMeds = [
   },
   {
     _id: "66f000000000000000000003",
-    id: "66f00000000000000000003",
+    id: "66f000000000000000000003",
+    patientId: "650000000000000000000002",
     name: "Metformin 500mg",
     purpose: "Diabetes management",
     form: "Tablet",
@@ -60,6 +63,7 @@ let localMeds = [
   {
     _id: "66f000000000000000000004",
     id: "66f000000000000000000004",
+    patientId: "650000000000000000000003",
     name: "Amlodipine 5mg",
     purpose: "Blood pressure",
     form: "Tablet",
@@ -81,14 +85,17 @@ const isDbConnected = () => mongoose.connection.readyState === 1;
 
 /**
  * GET /api/medications
- * Retrieve all patient medications from MongoDB.
+ * Retrieve patient medications filtered by patientId if provided.
  */
 exports.getMedications = async (req, res) => {
   try {
-    if (isDbConnected()) {
-      let medications = await Medication.find().sort({ createdAt: -1 });
+    const { patientId } = req.query;
 
-      if (medications.length === 0) {
+    if (isDbConnected()) {
+      const filter = patientId ? { patientId } : {};
+      let medications = await Medication.find(filter).sort({ createdAt: -1 });
+
+      if (medications.length === 0 && !patientId) {
         medications = await Medication.insertMany(localMeds);
       }
 
@@ -101,11 +108,16 @@ exports.getMedications = async (req, res) => {
     }
 
     // Graceful fallback when MongoDB Atlas connection is pending
+    let filteredLocal = localMeds;
+    if (patientId) {
+      filteredLocal = localMeds.filter((m) => m.patientId === patientId || (!m.patientId && patientId === '650000000000000000000001'));
+    }
+
     res.status(200).json({
       success: true,
       source: "memory-store",
-      count: localMeds.length,
-      data: localMeds,
+      count: filteredLocal.length,
+      data: filteredLocal,
     });
   } catch (error) {
     console.error("Error fetching medications:", error.message);
@@ -180,6 +192,7 @@ exports.createMedication = async (req, res) => {
       alert,
       taken,
       image,
+      patientId,
     } = req.body;
 
     if (!name || name.trim() === "") {
@@ -212,6 +225,7 @@ exports.createMedication = async (req, res) => {
       alert: alert !== undefined ? Boolean(alert) : true,
       taken: taken || {},
       image: image || "",
+      patientId: patientId || "",
     };
 
     if (isDbConnected()) {

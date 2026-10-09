@@ -1,4 +1,25 @@
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { API_BASE_URL } from './api-config';
+
+const TOKEN_KEY = 'medicare.access-token';
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  let token: string | null = null;
+  try {
+    if (Platform.OS === 'web') {
+      token = globalThis.localStorage?.getItem(TOKEN_KEY) ?? null;
+    } else {
+      token = await SecureStore.getItemAsync(TOKEN_KEY);
+    }
+  } catch {}
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 export class ApiError extends Error {
   status: number;
@@ -93,6 +114,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 export interface MedicationItem {
   _id?: string;
   id?: string;
+  patientId?: string;
   name: string;
   dosage: string;
   frequency?: string;
@@ -113,6 +135,11 @@ export interface PatientItem {
   role: string;
   statusBadgeText: string;
   phone: string;
+  bloodGroup?: string;
+  primaryDiagnosis?: string;
+  allergies?: string;
+  avatarUrl?: string;
+  emergencyContact?: string;
   vitals: {
     bloodPressure: string;
     heartRate: number;
@@ -127,7 +154,12 @@ export const DEFAULT_PATIENTS: PatientItem[] = [
     age: 68,
     role: 'Patient',
     statusBadgeText: 'MONITORING ACTIVE',
-    phone: '+1 (555) 019-2831',
+    phone: '+94 77 123 4567',
+    bloodGroup: 'O+',
+    primaryDiagnosis: 'Hypertension & Type 2 Diabetes',
+    allergies: 'Penicillin, Sulfa drugs',
+    emergencyContact: '0701982984',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
     vitals: {
       bloodPressure: '128/82',
       heartRate: 72,
@@ -140,7 +172,12 @@ export const DEFAULT_PATIENTS: PatientItem[] = [
     age: 74,
     role: 'Patient',
     statusBadgeText: 'MONITORING ACTIVE',
-    phone: '+1 (555) 019-4412',
+    phone: '+94 71 987 6543',
+    bloodGroup: 'A+',
+    primaryDiagnosis: 'Post-Stroke Rehabilitation',
+    allergies: 'None recorded',
+    emergencyContact: '0701982984',
+    avatarUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150',
     vitals: {
       bloodPressure: '135/88',
       heartRate: 78,
@@ -153,7 +190,12 @@ export const DEFAULT_PATIENTS: PatientItem[] = [
     age: 62,
     role: 'Patient',
     statusBadgeText: 'ATTENTION NEEDED',
-    phone: '+1 (555) 019-8890',
+    phone: '+94 70 198 2984',
+    bloodGroup: 'B+',
+    primaryDiagnosis: 'Mild Asthma & Joint Osteoarthritis',
+    allergies: 'Aspirin, Shellfish',
+    emergencyContact: '0701982984',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
     vitals: {
       bloodPressure: '142/92',
       heartRate: 84,
@@ -165,10 +207,11 @@ export const DEFAULT_PATIENTS: PatientItem[] = [
 export const medicationApi = {
   getMedications: async (patientId?: string): Promise<MedicationItem[]> => {
     try {
+      const headers = await getAuthHeaders();
       const url = patientId
         ? `${API_BASE_URL}/api/medications?patientId=${patientId}`
         : `${API_BASE_URL}/api/medications`;
-      const res = await fetch(url);
+      const res = await fetch(url, { headers });
       if (!res.ok) return [];
       const resData = await res.json();
       const list = Array.isArray(resData) ? resData : Array.isArray(resData?.data) ? resData.data : [];
@@ -179,6 +222,7 @@ export const medicationApi = {
   },
 
   addMedication: async (payload: {
+    patientId?: string;
     name: string;
     dosage: string;
     frequency?: string;
@@ -189,13 +233,14 @@ export const medicationApi = {
     meal?: string;
     stock?: number;
   }): Promise<MedicationItem> => {
+    const headers = await getAuthHeaders();
     const res = await fetch(`${API_BASE_URL}/api/medications`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
     });
     const resData = await res.json();
-    if (!res.ok) throw new Error(resData.message || 'Failed to add medication');
+    if (!res.ok) throw new Error(resData.error || resData.message || 'Failed to add medication');
     return resData.data || resData;
   },
 
@@ -213,32 +258,36 @@ export const medicationApi = {
       stock?: number;
     }
   ): Promise<MedicationItem> => {
+    const headers = await getAuthHeaders();
     const res = await fetch(`${API_BASE_URL}/api/medications/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
     });
     const resData = await res.json();
-    if (!res.ok) throw new Error(resData.message || 'Failed to update medication');
+    if (!res.ok) throw new Error(resData.error || resData.message || 'Failed to update medication');
     return resData.data || resData;
   },
 
   updateStatus: async (id: string, status: 'taken' | 'missed' | 'upcoming') => {
+    const headers = await getAuthHeaders();
     const res = await fetch(`${API_BASE_URL}/api/medications/${id}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ status }),
     });
     return await res.json();
   },
 
   deleteMedication: async (id: string): Promise<void> => {
+    const headers = await getAuthHeaders();
     const res = await fetch(`${API_BASE_URL}/api/medications/${id}`, {
       method: 'DELETE',
+      headers,
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      throw new Error(data.message || 'Failed to delete medication');
+      throw new Error(data.error || data.message || 'Failed to delete medication');
     }
   },
 };
@@ -253,5 +302,98 @@ export const patientApi = {
     } catch (error) {
       return DEFAULT_PATIENTS;
     }
+  },
+};
+
+export interface CaregiverNote {
+  id: string;
+  patientId: string;
+  title: string;
+  category: 'Vitals' | 'Diet' | 'Doctor Visit' | 'General';
+  content: string;
+  createdAt: string;
+  author: string;
+}
+
+const INITIAL_NOTES: CaregiverNote[] = [
+  {
+    id: 'note-1',
+    patientId: 'p-1',
+    title: 'Afternoon BP & Pulse Check',
+    category: 'Vitals',
+    content: 'Blood Pressure: 122/80 mmHg, Pulse: 72 bpm. Patient in good spirits after evening walk.',
+    createdAt: new Date().toISOString(),
+    author: 'Caregiver Sarah',
+  },
+  {
+    id: 'note-2',
+    patientId: 'p-1',
+    title: 'Dr. Patel Consultation Update',
+    category: 'Doctor Visit',
+    content: 'Doctor advised continuing Lisinopril 10mg. Next follow-up scheduled in 2 weeks.',
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+    author: 'Caregiver Sarah',
+  },
+];
+
+let inMemoryNotes: CaregiverNote[] = [...INITIAL_NOTES];
+
+export const notesApi = {
+  getNotes: async (patientId?: string): Promise<CaregiverNote[]> => {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/api/notes${patientId ? `?patientId=${patientId}` : ''}`, { headers });
+      if (!res.ok) return inMemoryNotes.filter((n) => !patientId || n.patientId === patientId);
+      const data = await res.json();
+      return Array.isArray(data) ? data : inMemoryNotes;
+    } catch {
+      return inMemoryNotes.filter((n) => !patientId || n.patientId === patientId);
+    }
+  },
+
+  addNote: async (payload: Omit<CaregiverNote, 'id' | 'createdAt'>): Promise<CaregiverNote> => {
+    const newNote: CaregiverNote = {
+      ...payload,
+      id: `note-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/api/notes`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(newNote),
+      });
+      if (res.ok) {
+        const resData = await res.json();
+        const saved = resData.data || resData;
+        inMemoryNotes.unshift(saved);
+        return saved;
+      }
+    } catch {}
+    inMemoryNotes.unshift(newNote);
+    return newNote;
+  },
+
+  updateNote: async (id: string, payload: Partial<CaregiverNote>): Promise<CaregiverNote> => {
+    inMemoryNotes = inMemoryNotes.map((n) => (n.id === id ? { ...n, ...payload } : n));
+    const updated = inMemoryNotes.find((n) => n.id === id);
+    try {
+      const headers = await getAuthHeaders();
+      await fetch(`${API_BASE_URL}/api/notes/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(payload),
+      });
+    } catch {}
+    return updated || ({ ...payload, id } as CaregiverNote);
+  },
+
+  deleteNote: async (id: string): Promise<void> => {
+    inMemoryNotes = inMemoryNotes.filter((n) => n.id !== id);
+    try {
+      const headers = await getAuthHeaders();
+      await fetch(`${API_BASE_URL}/api/notes/${id}`, { method: 'DELETE', headers });
+    } catch {}
   },
 };

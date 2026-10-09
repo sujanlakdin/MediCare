@@ -49,12 +49,13 @@ const defaultMedicationsList: MedicationItem[] = [
 ];
 
 interface MedicationListProps {
+  patientId?: string;
   onAddMedication?: () => void;
   onEditSchedule?: (med: MedicationItem) => void;
 }
 
-export const MedicationList: React.FC<MedicationListProps> = () => {
-  const [medications, setMedications] = useState<MedicationItem[]>(defaultMedicationsList);
+export const MedicationList: React.FC<MedicationListProps> = ({ patientId }) => {
+  const [medications, setMedications] = useState<MedicationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedMed, setSelectedMed] = useState<MedicationItem | null>(null);
@@ -63,10 +64,8 @@ export const MedicationList: React.FC<MedicationListProps> = () => {
   const fetchMeds = async () => {
     setLoading(true);
     try {
-      const data = await medicationApi.getMedications();
-      if (Array.isArray(data) && data.length > 0) {
-        setMedications(data);
-      }
+      const data = await medicationApi.getMedications(patientId);
+      setMedications(data);
     } catch (err) {
       console.warn('Error fetching medications:', err);
     } finally {
@@ -76,7 +75,7 @@ export const MedicationList: React.FC<MedicationListProps> = () => {
 
   useEffect(() => {
     fetchMeds();
-  }, []);
+  }, [patientId]);
 
   const handleOpenAdd = () => {
     setSelectedMed(null);
@@ -185,9 +184,15 @@ export const MedicationList: React.FC<MedicationListProps> = () => {
                     ) : null}
 
                     {med.stock !== undefined ? (
-                      <View style={styles.miniBadge}>
-                        <Ionicons name="cube-outline" size={10} color="#059669" />
-                        <Text style={[styles.miniBadgeText, { color: '#059669' }]}>{med.stock} left</Text>
+                      <View style={[styles.miniBadge, med.stock < 15 && { backgroundColor: '#FEE2E2' }]}>
+                        <Ionicons
+                          name="cube-outline"
+                          size={10}
+                          color={med.stock < 15 ? '#DC2626' : '#059669'}
+                        />
+                        <Text style={[styles.miniBadgeText, { color: med.stock < 15 ? '#DC2626' : '#059669', fontWeight: med.stock < 15 ? '700' : '600' }]}>
+                          {med.stock} left {med.stock < 15 ? '(Low Stock)' : ''}
+                        </Text>
                       </View>
                     ) : null}
                   </View>
@@ -227,6 +232,7 @@ export const MedicationList: React.FC<MedicationListProps> = () => {
         onSuccess={fetchMeds}
         initialData={selectedMed}
         isEditMode={isEditMode}
+        patientId={patientId}
       />
     </View>
   );

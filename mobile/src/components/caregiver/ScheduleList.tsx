@@ -36,40 +36,98 @@ const DEFAULT_ITEMS: ScheduleItem[] = [
   },
 ];
 
-export function ScheduleList({ items = DEFAULT_ITEMS }: ScheduleListProps) {
+function getCountdownText(timeStr?: string): { label: string; isUpcoming?: boolean; badgeColor?: string } {
+  if (!timeStr) return { label: 'Scheduled' };
+
+  try {
+    const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return { label: `Scheduled — ${timeStr}` };
+
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const period = match[3].toUpperCase();
+
+    if (period === 'PM' && hours < 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+
+    const now = new Date();
+    const scheduledDate = new Date();
+    scheduledDate.setHours(hours, minutes, 0, 0);
+
+    let diffMs = scheduledDate.getTime() - now.getTime();
+
+    // If scheduled time was early morning (e.g. 12:00 AM) and now is late night (10:40 PM), it refers to next day
+    if (diffMs < -12 * 60 * 60 * 1000) {
+      scheduledDate.setDate(scheduledDate.getDate() + 1);
+      diffMs = scheduledDate.getTime() - now.getTime();
+    }
+
+    const diffMins = Math.round(diffMs / (1000 * 60));
+
+    if (diffMins > 0) {
+      const h = Math.floor(diffMins / 60);
+      const m = diffMins % 60;
+      if (h > 0) {
+        return { label: `Due in ${h}h ${m}m (${timeStr})`, isUpcoming: true, badgeColor: Colors.light.primary };
+      }
+      return { label: `Due in ${m}m (${timeStr})`, isUpcoming: true, badgeColor: '#D97706' };
+    } else if (diffMins >= -60) {
+      return { label: `Due Now (${timeStr})`, isUpcoming: true, badgeColor: Colors.light.alert };
+    } else {
+      return { label: `Scheduled — ${timeStr}`, isUpcoming: false, badgeColor: Colors.light.textSecondary };
+    }
+  } catch (err) {
+    return { label: `Scheduled — ${timeStr}` };
+  }
+}
+
+export function ScheduleList({ items = [] }: ScheduleListProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Today's Schedule</Text>
       <View style={styles.listGap}>
-        {items.map((item) => {
-          const isMissed = item.status === 'Missed';
-          const isCompleted = item.status === 'Completed';
+        {items.length === 0 ? (
+          <View style={styles.itemCard}>
+            <Text style={{ fontSize: 13, color: Colors.light.textSecondary, fontStyle: 'italic' }}>
+              No medications scheduled for today.
+            </Text>
+          </View>
+        ) : (
+          items.map((item) => {
+            const isMissed = item.status === 'Missed';
+            const isCompleted = item.status === 'Completed';
+            const countdownInfo = item.status === 'Scheduled' ? getCountdownText(item.scheduledTime) : null;
 
-          return (
-            <View
-              key={item.id}
-              style={[
-                styles.itemCard,
-                isMissed && styles.missedCard,
-              ]}>
-              <View style={styles.leftCol}>
-                <Text style={styles.periodText}>{item.period}</Text>
-                <Text style={styles.medText}>{item.medications}</Text>
+            return (
+              <View
+                key={item.id}
+                style={[
+                  styles.itemCard,
+                  isMissed && styles.missedCard,
+                ]}>
+                <View style={styles.leftCol}>
+                  <Text style={styles.periodText}>{item.period}</Text>
+                  <Text style={styles.medText}>{item.medications}</Text>
+                </View>
+                <View style={styles.rightCol}>
+                  {isCompleted && (
+                    <Text style={styles.completedText}>Completed</Text>
+                  )}
+                  {isMissed && <Text style={styles.missedText}>Missed</Text>}
+                  {item.status === 'Scheduled' && countdownInfo && (
+                    <Text
+                      style={[
+                        styles.scheduledText,
+                        countdownInfo.isUpcoming && { fontWeight: '700', color: countdownInfo.badgeColor },
+                      ]}>
+                      {countdownInfo.label}
+                    </Text>
+                  )}
+                </View>
               </View>
-              <View style={styles.rightCol}>
-                {isCompleted && (
-                  <Text style={styles.completedText}>Completed</Text>
-                )}
-                {isMissed && <Text style={styles.missedText}>Missed</Text>}
-                {item.status === 'Scheduled' && (
-                  <Text style={styles.scheduledText}>
-                    Scheduled — {item.scheduledTime || '6:00 PM'}
-                  </Text>
-                )}
-              </View>
-            </View>
-          );
-        })}
+            );
+          })
+        )}
       </View>
     </View>
   );
