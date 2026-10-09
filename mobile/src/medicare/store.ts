@@ -152,10 +152,24 @@ function to12(time: string) {
   }`;
 }
 
+function safeTo12(time: string) {
+  try {
+    return to12(time);
+  } catch {
+    return '08:00 AM';
+  }
+}
+
 export function getTimeOfDayGroup(
   time: string
 ): TimeOfDayGroup {
-  const hour = Number(to24(time).split(':')[0]);
+  let hour = 8;
+
+  try {
+    hour = Number(to24(time).split(':')[0]);
+  } catch {
+    hour = 8;
+  }
 
   if (hour >= 4 && hour < 12) return 'MORNING';
   if (hour >= 12 && hour < 17) return 'AFTERNOON';
@@ -244,7 +258,7 @@ function mapReminder(record: ReminderRecord): Reminder {
   return {
     id: record._id,
     medicationId: record.medicationId,
-    time: to12(record.time),
+    time: safeTo12(record.time),
     repeat: record.repeat,
     startDate: record.startDate,
     snoozeEnabled: record.snoozeEnabled,
@@ -275,7 +289,7 @@ function mapMedication(
     dose: reminder?.dose ||
       `${record.qty ?? 1} ${record.form || 'Tablet'}`,
     instructions:
-      reminder?.instructions ?? record.meal ?? '',
+      reminder?.instructions || record.meal || '',
     timeOfDayGroup: getTimeOfDayGroup(
       reminder?.time || record.times?.[0] || '08:00'
     ),
@@ -470,6 +484,27 @@ export function updateMedication(
     medicationRecords = medicationRecords.map(
       (med) => med._id === id ? saved : med
     );
+
+    const linked = reminders.find(
+      (reminder) => reminder.medicationId === id
+    );
+
+    if (linked) {
+      const savedReminder = mapReminder(
+        await reminderApi.update(
+          linked.id,
+          reminderPayload(linked),
+          captured.token
+        )
+      );
+
+      assertSession(captured);
+      reminders = reminders.map(
+        (reminder) =>
+          reminder.id === linked.id ? savedReminder : reminder
+      );
+    }
+
     notify();
 
     return { ...item };
@@ -480,9 +515,6 @@ export function deleteMedication(id: string): Promise<boolean> {
   return run(async () => {
     const captured = await ready();
     requireMedication(id);
-
-    await medicareMedicationApi.list(captured.token);
-    assertSession(captured);
 
     const relatedReminders = reminders.filter(
       (item) => item.medicationId === id
@@ -646,8 +678,12 @@ function recordDose(
 
     const payload = {
       status,
-      note: options?.note ?? existing?.note ??
-        (status === 'skipped' ? 'Skipped dose' : ''),
+      note: options?.note ??
+        (status === 'skipped'
+          ? 'Skipped dose'
+          : existing?.status === 'taken'
+            ? existing.note
+            : ''),
       sideEffects: options?.sideEffects ??
         (status === 'taken' ? existing?.sideEffects || [] : []),
       at: options?.takenAt || new Date().toISOString(),
@@ -827,7 +863,7 @@ export function computeScheduleItems(): ScheduleItem[] {
     const log = getTodayDoseLog(med.id);
 
     const time = reminder?.time ||
-      to12(record?.times?.[0] || '08:00');
+      safeTo12(record?.times?.[0] || '08:00');
 
     const startDate =
       reminder?.startDate || record?.start || today;
