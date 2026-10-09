@@ -14,6 +14,8 @@ import { PATIENT_COLORS } from '../../constants/patientTheme';
 import { useAuth } from '../../contexts/auth-context';
 import {
   useMedications,
+  listMedications,
+  clearMedicationsStore,
   getFlattenedDoses,
   formatTime12h,
   getCurrentTime24,
@@ -24,11 +26,17 @@ import BottomNav from '../../components/patient/BottomNav';
 import PatientIcon from '../../components/patient/PatientIcons';
 
 export default function DashboardScreen() {
-  const medications = useMedications();
   const { user, signOut } = useAuth();
+  const medications = useMedications(user?.id);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const [accountModalVisible, setAccountModalVisible] = useState(false);
+
+  useEffect(() => {
+    if (user?.id) {
+      listMedications(user.id);
+    }
+  }, [user?.id]);
 
   const displayName = user?.fullName ? user.fullName.split(' ')[0] : 'Chathura';
   const fullName = user?.fullName || 'Chathura Rajapakse';
@@ -49,6 +57,7 @@ export default function DashboardScreen() {
 
   const handleSignOut = async () => {
     setAccountModalVisible(false);
+    clearMedicationsStore();
     await signOut();
     showToast('Signed out of MediCare');
     setTimeout(() => {
@@ -58,6 +67,7 @@ export default function DashboardScreen() {
 
   const handleSwitchAccount = async () => {
     setAccountModalVisible(false);
+    clearMedicationsStore();
     await signOut();
     router.replace('/(auth)/login' as any);
   };
@@ -142,13 +152,15 @@ export default function DashboardScreen() {
                 Today's Progress
               </Text>
               <Text style={styles.progressBigText} allowFontScaling={true}>
-                {takenDoses} of {totalDoses} doses
+                {totalDoses === 0 ? '0/0' : `${takenDoses} of ${totalDoses}`}
               </Text>
               <Text style={styles.progressOkLabel} allowFontScaling={true}>
-                taken
+                {totalDoses === 0 ? '0% doses taken' : 'taken'}
               </Text>
               <Text style={styles.progressSubtext} allowFontScaling={true}>
-                {nextPendingDose
+                {totalDoses === 0
+                  ? 'No medications scheduled for today'
+                  : nextPendingDose
                   ? `Next: ${nextPendingDose.medication.name} at ${formatTime12h(
                       nextPendingDose.time
                     )}`
@@ -205,10 +217,34 @@ export default function DashboardScreen() {
             Today's Schedule
           </Text>
 
-          {doses.length === 0 ? (
+          {medications.length === 0 ? (
+            <View style={styles.emptyScheduleCard}>
+              <View style={styles.emptyIconCircle}>
+                <PatientIcon name="pill" size={28} color={PATIENT_COLORS.brand} strokeWidth={2} />
+              </View>
+              <Text style={styles.emptyCardTitle} allowFontScaling={true}>
+                No medications added yet.
+              </Text>
+              <Text style={styles.emptyCardSubtext} allowFontScaling={true}>
+                Add your prescribed medicines to track daily doses and reminders.
+              </Text>
+              <TouchableOpacity
+                style={styles.emptyAddButton}
+                onPress={() => router.push('/(patient)/medication-form' as any)}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="+ Add Medication"
+              >
+                <PatientIcon name="plus" size={18} color={PATIENT_COLORS.white} strokeWidth={2.4} />
+                <Text style={styles.emptyAddButtonText} allowFontScaling={true}>
+                  + Add Medication
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : doses.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText} allowFontScaling={true}>
-                No medicines yet. Add your first one.
+                No doses scheduled for today.
               </Text>
             </View>
           ) : (
@@ -277,19 +313,21 @@ export default function DashboardScreen() {
             })
           )}
 
-          {/* Add Medication Pill Button */}
-          <TouchableOpacity
-            style={styles.addMedButton}
-            onPress={() => router.push('/(patient)/medication-form' as any)}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Add Medication"
-          >
-            <PatientIcon name="plus" size={22} color={PATIENT_COLORS.white} strokeWidth={2.4} />
-            <Text style={styles.addMedButtonText} allowFontScaling={true}>
-              Add Medication
-            </Text>
-          </TouchableOpacity>
+          {/* Add Medication Pill Button (when medications already exist) */}
+          {medications.length > 0 && (
+            <TouchableOpacity
+              style={styles.addMedButton}
+              onPress={() => router.push('/(patient)/medication-form' as any)}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Add Medication"
+            >
+              <PatientIcon name="plus" size={22} color={PATIENT_COLORS.white} strokeWidth={2.4} />
+              <Text style={styles.addMedButtonText} allowFontScaling={true}>
+                Add Medication
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeScreen>
 
@@ -632,6 +670,62 @@ const styles = StyleSheet.create({
     color: PATIENT_COLORS.muted,
     fontSize: 16,
     fontWeight: '500',
+  },
+  emptyScheduleCard: {
+    backgroundColor: PATIENT_COLORS.surface,
+    borderWidth: 1.5,
+    borderColor: PATIENT_COLORS.border,
+    borderStyle: 'dashed',
+    borderRadius: 24,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 10,
+  },
+  emptyIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: PATIENT_COLORS.mint,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  emptyCardTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: PATIENT_COLORS.deep,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  emptyCardSubtext: {
+    fontSize: 14,
+    color: PATIENT_COLORS.muted,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 18,
+    paddingHorizontal: 12,
+  },
+  emptyAddButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: PATIENT_COLORS.brand,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 999,
+    gap: 8,
+    shadowColor: PATIENT_COLORS.brand,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  emptyAddButtonText: {
+    color: PATIENT_COLORS.white,
+    fontSize: 16,
+    fontWeight: '700',
   },
   doseCard: {
     flexDirection: 'row',

@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
 const User = require("../models/User");
+const inMemoryUserStore = require("../store/inMemoryUserStore");
 const {
   readBoolean,
   readDate,
@@ -56,6 +57,7 @@ function removeStoredProfilePhoto(profilePhotoUrl) {
   const fullPath = path.join(uploadDirectory, fileName);
   if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
 }
+
 const notificationKeys = [
   "medicationReminders",
   "reminderSound",
@@ -88,6 +90,48 @@ function pickSettings(input, booleanKeys, extraKeys = []) {
   return settings;
 }
 
+async function getUserById(userId) {
+  if (inMemoryUserStore.isDbConnected()) {
+    try {
+      const user = await User.findById(userId).select("-passwordHash").lean();
+      if (user) return user;
+    } catch (err) {
+      console.warn("MongoDB findById failed, falling back to in-memory store:", err.message);
+    }
+  }
+  const memUser = await inMemoryUserStore.findById(userId);
+  if (memUser) {
+    const copy = { ...memUser };
+    delete copy.passwordHash;
+    return copy;
+  }
+  return null;
+}
+
+async function updateUserById(userId, updates) {
+  if (inMemoryUserStore.isDbConnected()) {
+    try {
+      const user = await User.findByIdAndUpdate(userId, { $set: updates }, { new: true, runValidators: true })
+        .select("-passwordHash")
+        .lean();
+      if (user) {
+        await inMemoryUserStore.updateUser(userId, updates);
+        return user;
+      }
+    } catch (err) {
+      if (err.code === 11000) throw err;
+      console.warn("MongoDB findByIdAndUpdate failed, using in-memory store:", err.message);
+    }
+  }
+  const memUser = await inMemoryUserStore.updateUser(userId, updates);
+  if (memUser) {
+    const copy = { ...memUser };
+    delete copy.passwordHash;
+    return copy;
+  }
+  return null;
+}
+
 const handleProfilePhotoUpload = async (req, res) => {
   const file = req.file;
   if (!file) {
@@ -96,20 +140,16 @@ const handleProfilePhotoUpload = async (req, res) => {
     throw error;
   }
 
-  const user = await User.findById(req.userId).select("profilePhotoUrl").lean();
+  const user = await getUserById(req.userId);
   if (!user) return res.status(404).json({ error: "Profile not found." });
 
   const previousPhotoUrl = user.profilePhotoUrl || "";
   const baseUrl = `${req.protocol}://${req.get("host")}`;
   const profilePhotoUrl = `${baseUrl}/uploads/${encodeURIComponent(file.filename)}`;
 
-  const updatedUser = await User.findByIdAndUpdate(
-    req.userId,
-    { $set: { profilePhotoUrl } },
-    { new: true, runValidators: true }
-  ).select("-passwordHash").lean();
-
+  const updatedUser = await updateUserById(req.userId, { profilePhotoUrl });
   if (!updatedUser) return res.status(404).json({ error: "Profile not found." });
+
   if (previousPhotoUrl && previousPhotoUrl !== profilePhotoUrl) removeStoredProfilePhoto(previousPhotoUrl);
 
   res.json({
@@ -123,17 +163,13 @@ router.put("/profile-photo", upload.single("photo"), handleProfilePhotoUpload);
 router.post("/profile-photo", upload.single("photo"), handleProfilePhotoUpload);
 
 router.delete("/profile-photo", async (req, res) => {
-  const user = await User.findById(req.userId).select("profilePhotoUrl").lean();
+  const user = await getUserById(req.userId);
   if (!user) return res.status(404).json({ error: "Profile not found." });
 
   const previousPhotoUrl = user.profilePhotoUrl || "";
-  const updatedUser = await User.findByIdAndUpdate(
-    req.userId,
-    { $set: { profilePhotoUrl: "" } },
-    { new: true, runValidators: true }
-  ).select("-passwordHash").lean();
-
+  const updatedUser = await updateUserById(req.userId, { profilePhotoUrl: "" });
   if (!updatedUser) return res.status(404).json({ error: "Profile not found." });
+
   if (previousPhotoUrl) removeStoredProfilePhoto(previousPhotoUrl);
 
   res.json({
@@ -144,7 +180,7 @@ router.delete("/profile-photo", async (req, res) => {
 });
 
 router.get("/profile", async (req, res) => {
-  const user = await User.findById(req.userId).select("-passwordHash").lean();
+  const user = await getUserById(req.userId);
   if (!user) return res.status(404).json({ error: "Profile not found." });
   res.json({ profile: user });
 });
@@ -159,15 +195,34 @@ router.put("/profile", async (req, res) => {
   if (Object.prototype.hasOwnProperty.call(body, "phone")) {
     updates.phone = readPhone(body.phone, { required: false });
   }
-  if (Object.prototype.hasOwnProperty.call(body, "dateOfBirth")) updates.dateOfBirth = readDate(body.dateOfBirth);
-  if (Object.prototype.hasOwnProperty.call(body, "gender")) {
+  if (Object.prototype.hasOwnProperty.call(body, "age") && body.age !== null && body.age !== undefined && body.age !== "") {
+    const parsedAge = Number(body.age);
+    if (!isNaN(parsedAge) && parsedAge >= 0 && parsedAge <= 130) {
+      updates.age = parsedAge;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "dateOfBirth") && body.dateOfBirth) {
+    updates.dateOfBirth = typeof body.dateOfBirth === "string" ? body.dateOfBirth.trim() : readDate(body.dateOfBirth);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "gender") && body.gender) {
     updates.gender = readString(body.gender, "Gender", { required: false, maxLength: 60 });
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "bloodGroup") && body.bloodGroup) {
+    updates.bloodGroup = readString(body.bloodGroup, "Blood group", { required: false, maxLength: 10 });
   }
   if (Object.prototype.hasOwnProperty.call(body, "address")) {
     updates.address = readString(body.address, "Address", { required: false, maxLength: 300 });
   }
   if (Object.prototype.hasOwnProperty.call(body, "profilePhotoUrl")) {
     updates.profilePhotoUrl = readString(body.profilePhotoUrl, "Profile photo URL", { required: false, maxLength: 2048 });
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "emergencyContact") && typeof body.emergencyContact === "object" && body.emergencyContact !== null) {
+    updates.emergencyContact = {
+      name: readString(body.emergencyContact.name || "", "Emergency contact name", { required: false, maxLength: 120 }),
+      relationship: readString(body.emergencyContact.relationship || "", "Relationship", { required: false, maxLength: 80 }),
+      phone: readString(body.emergencyContact.phone || "", "Emergency phone", { required: false, maxLength: 30 }),
+      email: readString(body.emergencyContact.email || "", "Emergency email", { required: false, maxLength: 254 }),
+    };
   }
   if (!Object.keys(updates).length) {
     const error = new Error("Provide at least one profile field to update.");
@@ -176,11 +231,28 @@ router.put("/profile", async (req, res) => {
   }
 
   try {
-    const user = await User.findByIdAndUpdate(req.userId, { $set: updates }, { new: true, runValidators: true })
-      .select("-passwordHash")
-      .lean();
+    const user = await updateUserById(req.userId, updates);
     if (!user) return res.status(404).json({ error: "Profile not found." });
-    res.json({ profile: user });
+
+    // Sync with Patient model if available
+    try {
+      const Patient = require("../../models/Patient");
+      if (inMemoryUserStore.isDbConnected()) {
+        await Patient.findByIdAndUpdate(
+          req.userId,
+          {
+            $set: {
+              ...(updates.fullName ? { name: updates.fullName } : {}),
+              ...(updates.age ? { age: updates.age } : {}),
+              ...(updates.phone ? { phone: updates.phone } : {}),
+            },
+          },
+          { runValidators: false }
+        );
+      }
+    } catch {}
+
+    res.json({ profile: user, message: "Profile updated successfully." });
   } catch (error) {
     if (error.code === 11000) return res.status(409).json({ error: "That email is already in use." });
     throw error;
@@ -188,41 +260,35 @@ router.put("/profile", async (req, res) => {
 });
 
 router.get("/notification-settings", async (req, res) => {
-  const user = await User.findById(req.userId).select("notificationSettings").lean();
+  const user = await getUserById(req.userId);
   if (!user) return res.status(404).json({ error: "Settings not found." });
   res.json({ settings: user.notificationSettings });
 });
 
 router.put("/notification-settings", async (req, res) => {
   const settings = pickSettings(req.body, notificationKeys, ["preferredReminderTime"]);
-  const user = await User.findByIdAndUpdate(
-    req.userId,
-    { $set: Object.fromEntries(Object.entries(settings).map(([key, value]) => [`notificationSettings.${key}`, value])) },
-    { new: true, runValidators: true }
-  ).select("notificationSettings");
+  const updates = Object.fromEntries(Object.entries(settings).map(([key, value]) => [`notificationSettings.${key}`, value]));
+  const user = await updateUserById(req.userId, updates);
   if (!user) return res.status(404).json({ error: "Settings not found." });
   res.json({ settings: user.notificationSettings });
 });
 
 router.get("/accessibility-settings", async (req, res) => {
-  const user = await User.findById(req.userId).select("accessibilitySettings").lean();
+  const user = await getUserById(req.userId);
   if (!user) return res.status(404).json({ error: "Settings not found." });
   res.json({ settings: user.accessibilitySettings });
 });
 
 router.put("/accessibility-settings", async (req, res) => {
   const settings = pickSettings(req.body, accessibilityKeys, ["fontSize"]);
-  const user = await User.findByIdAndUpdate(
-    req.userId,
-    { $set: Object.fromEntries(Object.entries(settings).map(([key, value]) => [`accessibilitySettings.${key}`, value])) },
-    { new: true, runValidators: true }
-  ).select("accessibilitySettings");
+  const updates = Object.fromEntries(Object.entries(settings).map(([key, value]) => [`accessibilitySettings.${key}`, value]));
+  const user = await updateUserById(req.userId, updates);
   if (!user) return res.status(404).json({ error: "Settings not found." });
   res.json({ settings: user.accessibilitySettings });
 });
 
 router.get("/emergency-contact", async (req, res) => {
-  const user = await User.findById(req.userId).select("emergencyContact").lean();
+  const user = await getUserById(req.userId);
   if (!user) return res.status(404).json({ error: "Emergency contact not found." });
   res.json({ emergencyContact: user.emergencyContact });
 });
@@ -234,11 +300,7 @@ router.put("/emergency-contact", async (req, res) => {
     phone: readPhone(req.body.phone),
     email: readEmail(req.body.email || "", { required: false }),
   };
-  const user = await User.findByIdAndUpdate(
-    req.userId,
-    { $set: { emergencyContact } },
-    { new: true, runValidators: true }
-  ).select("emergencyContact");
+  const user = await updateUserById(req.userId, { emergencyContact });
   if (!user) return res.status(404).json({ error: "Profile not found." });
   res.json({ emergencyContact: user.emergencyContact });
 });

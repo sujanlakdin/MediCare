@@ -15,8 +15,10 @@ import Toast from '../../components/auth/Toast';
 import BottomNav from '../../components/patient/BottomNav';
 import PatientIcon from '../../components/patient/PatientIcons';
 import { PATIENT_COLORS } from '../../constants/patientTheme';
+import { useAuth } from '../../contexts/auth-context';
 import {
   useMedications,
+  listMedications,
   formatTime12h,
   getTimePeriod,
   formatDaysSummary,
@@ -28,7 +30,14 @@ import {
 
 export default function MedicationDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
-  const medications = useMedications();
+  const { user } = useAuth();
+  const medications = useMedications(user?.id);
+
+  useEffect(() => {
+    if (user?.id) {
+      listMedications(user.id);
+    }
+  }, [user?.id]);
 
   const medication: Medication | undefined = medications.find(
     (m) => String(m.id) === String(params.id) || (m._id && String(m._id) === String(params.id))

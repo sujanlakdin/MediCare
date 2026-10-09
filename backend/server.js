@@ -1,8 +1,19 @@
+const dns = require("dns");
+try {
+  dns.setServers(["8.8.8.8", "1.1.1.1"]);
+  if (dns.setDefaultResultOrder) dns.setDefaultResultOrder("ipv4first");
+} catch (dnsErr) {
+  console.warn("⚠️ DNS setup notice:", dnsErr.message);
+}
+
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const path = require("path");
 require("dotenv").config();
+
+// Avoid 10s buffering hangs when database is disconnected or connecting
+mongoose.set("bufferCommands", false);
 
 const authRoutes = require("./src/routes/auth");
 const userRoutes = require("./src/routes/users");
@@ -61,28 +72,62 @@ app.get("/", (req, res) => {
   });
 });
 
-// Connect to MongoDB
-const primaryUri = process.env.MONGO_URI || "mongodb+srv://medicare_admin:LyTdfo6vGwXFSOT8@cluster0.swmcvu7.mongodb.net/medicare?retryWrites=true&w=majority&appName=Cluster0";
-const localUri = "mongodb://127.0.0.1:27017/medicare";
+// Database Connection with SRV and Standard Connection String Fallback
+const primaryUri =
+  process.env.MONGO_URI ||
+  "mongodb+srv://medicare_admin:LyTdfo6vGwXFSOT8@cluster0.swmcvu7.mongodb.net/medicare?retryWrites=true&w=majority&appName=Cluster0";
 
-mongoose
-  .connect(primaryUri, { serverSelectionTimeoutMS: 5000 })
-  .then(() => {
-    console.log("🟢 MongoDB connected successfully (Atlas Cloud)!");
-  })
-  .catch((error) => {
-    console.warn("⚠️ Cloud MongoDB Atlas connection failed/timed out:", error.message);
+const standardAtlasUri =
+  process.env.MONGO_STANDARD_URI ||
+  "mongodb://medicare_admin:LyTdfo6vGwXFSOT8@ac-wenatff-shard-00-00.swmcvu7.mongodb.net:27017,ac-wenatff-shard-00-01.swmcvu7.mongodb.net:27017,ac-wenatff-shard-00-02.swmcvu7.mongodb.net:27017/medicare?ssl=true&replicaSet=atlas-ems5v0-shard-0&authSource=admin&retryWrites=true&w=majority";
+
+const localUri = process.env.MONGO_LOCAL_URI || "mongodb://127.0.0.1:27017/medicare";
+
+const mongoOptions = {
+  serverSelectionTimeoutMS: 5000,
+  connectTimeoutMS: 10000,
+  socketTimeoutMS: 45000,
+  family: 4,
+};
+
+async function connectToDatabase() {
+  // Try 1: Primary URI (SRV or custom configured)
+  try {
+    console.log("🔄 Connecting to MongoDB (Primary URI)...");
+    await mongoose.connect(primaryUri, mongoOptions);
+    console.log("🟢 MongoDB connected successfully (Atlas Cloud via SRV)!");
+    return;
+  } catch (error) {
+    console.warn("⚠️ Cloud MongoDB Atlas (SRV) connection failed:", error.message);
+  }
+
+  // Try 2: Standard replica set connection string format (bypasses SRV lookup if querySrv failed)
+  if (standardAtlasUri && standardAtlasUri !== primaryUri) {
+    try {
+      console.log("🔄 Attempting fallback to standard Atlas replica set URI...");
+      await mongoose.connect(standardAtlasUri, mongoOptions);
+      console.log("🟢 MongoDB connected successfully (Atlas Cloud via Standard Replica Set)!");
+      return;
+    } catch (standardErr) {
+      console.warn("⚠️ Cloud MongoDB Atlas standard URI connection failed:", standardErr.message);
+    }
+  }
+
+  // Try 3: Local MongoDB
+  try {
     console.log("🔄 Attempting fallback to local MongoDB...");
-    mongoose
-      .connect(localUri, { serverSelectionTimeoutMS: 3000 })
-      .then(() => {
-        console.log("🟢 MongoDB connected successfully (Local Database)!");
-      })
-      .catch((localErr) => {
-        console.error("🔴 Local MongoDB also unavailable:", localErr.message);
-        console.log("💡 Application will use in-memory state fallback for requests.");
-      });
-  });
+    await mongoose.connect(localUri, { ...mongoOptions, serverSelectionTimeoutMS: 3000 });
+    console.log("🟢 MongoDB connected successfully (Local Database)!");
+    return;
+  } catch (localErr) {
+    console.warn("🔴 Local MongoDB also unavailable:", localErr.message);
+  }
+
+  // Graceful In-Memory fallback mode
+  console.log("💡 Application will use in-memory state fallback for requests.");
+}
+
+connectToDatabase();
 
 const PORT = process.env.PORT || 5000;
 

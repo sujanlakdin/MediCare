@@ -9,6 +9,8 @@ export default function SignUpRoute() {
         router.push('/login' as any);
       } else if (screen === 'Welcome' || screen === '/welcome') {
         router.push('/welcome' as any);
+      } else if (screen.includes('complete-profile') || screen === 'CompleteProfile') {
+        router.push('/(patient)/complete-profile' as any);
       } else if (screen.includes('dashboard')) {
         router.replace('/(patient)/dashboard' as any);
       } else {
@@ -18,6 +20,8 @@ export default function SignUpRoute() {
     replace: (screen: string) => {
       if (screen === 'Login' || screen === '/login') {
         router.replace('/login' as any);
+      } else if (screen.includes('complete-profile') || screen === 'CompleteProfile') {
+        router.replace('/(patient)/complete-profile' as any);
       } else if (screen.includes('dashboard')) {
         router.replace('/(patient)/dashboard' as any);
       } else {

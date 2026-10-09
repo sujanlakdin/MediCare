@@ -239,8 +239,8 @@ export default function SignUpScreen({ navigation }) {
       showToast('Account created successfully!');
 
       setTimeout(() => {
-        router.replace('/');
-      }, 600);
+        router.replace('/(patient)/complete-profile');
+      }, 500);
     } catch (err) {
       showToast(err.message || 'Registration failed. Please try again.');
     } finally {

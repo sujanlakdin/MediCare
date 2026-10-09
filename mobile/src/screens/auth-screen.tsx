@@ -36,9 +36,13 @@ export default function AuthScreen({ mode }: AuthScreenProps) {
     }
     setIsSaving(true);
     try {
-      if (isRegister) await register(fullName.trim(), email.trim(), password);
-      else await signIn(email.trim(), password);
-      router.replace('/');
+      if (isRegister) {
+        await register(fullName.trim(), email.trim(), password);
+        router.replace('/(patient)/complete-profile');
+      } else {
+        await signIn(email.trim(), password);
+        router.replace('/');
+      }
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : 'Unable to sign in. Please try again.');
     } finally {

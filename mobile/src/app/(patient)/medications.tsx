@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,10 @@ import { router } from 'expo-router';
 import SafeScreen from '../../components/auth/SafeScreen';
 import Toast from '../../components/auth/Toast';
 import { PATIENT_COLORS } from '../../constants/patientTheme';
+import { useAuth } from '../../contexts/auth-context';
 import {
   useMedications,
+  listMedications,
   deleteMedication,
   formatTime12h,
   getTimePeriod,
@@ -25,7 +27,14 @@ import MedicationThumb from '../../components/patient/MedicationThumb';
 type PeriodFilter = 'All' | 'Morning' | 'Afternoon' | 'Evening';
 
 export default function MedicationsScreen() {
-  const medications = useMedications();
+  const { user } = useAuth();
+  const medications = useMedications(user?.id);
+
+  useEffect(() => {
+    if (user?.id) {
+      listMedications(user.id);
+    }
+  }, [user?.id]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<PeriodFilter>('All');
   const [armedDeleteId, setArmedDeleteId] = useState<number | string | null>(null);

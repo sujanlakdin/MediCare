@@ -1,40 +1,51 @@
 const User = require("../models/User");
 const mongoose = require("mongoose");
+const inMemoryUserStore = require("../src/store/inMemoryUserStore");
+
+const isDbConnected = () => mongoose.connection.readyState === 1;
 
 /**
  * Seed or retrieve the default elderly profile (Chathura Rajapakse, 72 yrs)
  */
 async function getOrCreateElderlyUser() {
-  let user = await User.findOne({ email: "chathura.rajapakse@medicare.com" });
-  if (!user) {
-    // If not found by email, check if any user exists
-    user = await User.findOne();
+  if (isDbConnected()) {
+    try {
+      let user = await User.findOne({ email: "chathura.rajapakse@medicare.com" });
+      if (!user) {
+        user = await User.findOne();
+      }
+      if (!user) {
+        user = new User({
+          fullName: "Chathura Rajapakse",
+          email: "chathura.rajapakse@medicare.com",
+          phone: "+94 77 123 4567",
+          password: "MedicarePass2026!",
+          age: 72,
+          residentialAddress: "No. 45, Temple Road, Colombo 03",
+          medicalId: "MED-72491",
+          accessibilitySettings: {
+            highContrast: false,
+            largerTouchTargets: true,
+            voiceAssistance: false,
+            reduceMotion: false,
+            simpleLanguage: true,
+            textSize: "large",
+          },
+        });
+        await user.save();
+        console.log("Seeded default elderly user profile for Chathura Rajapakse (Age 72).");
+      }
+      return user;
+    } catch (err) {
+      console.warn("MongoDB elderly seed failed, falling back to in-memory:", err.message);
+    }
   }
 
-  // If database is completely empty, seed the milestone prototype elderly user
-  if (!user) {
-    user = new User({
-      fullName: "Chathura Rajapakse",
-      email: "chathura.rajapakse@medicare.com",
-      phone: "+94 77 123 4567",
-      password: "MedicarePass2026!",
-      age: 72,
-      residentialAddress: "No. 45, Temple Road, Colombo 03",
-      medicalId: "MED-72491",
-      accessibilitySettings: {
-        highContrast: false,
-        largerTouchTargets: true,
-        voiceAssistance: false,
-        reduceMotion: false,
-        simpleLanguage: true,
-        textSize: "large",
-      },
-    });
-    await user.save();
-    console.log("Seeded default elderly user profile for Chathura Rajapakse (Age 72).");
-  }
-
-  return user;
+  return (
+    (await inMemoryUserStore.findById("650000000000000000000001")) ||
+    (await inMemoryUserStore.findByEmail("chathura.rajapakse@medicare.com")) ||
+    (inMemoryUserStore.getAllUsers()[0])
+  );
 }
 
 /**
@@ -42,13 +53,22 @@ async function getOrCreateElderlyUser() {
  */
 async function findUserByIdOrFallback(identifier) {
   if (identifier && identifier !== "default" && identifier !== "current") {
-    if (mongoose.Types.ObjectId.isValid(identifier)) {
-      const user = await User.findById(identifier);
-      if (user) return user;
-    } else {
-      const user = await User.findOne({ email: identifier.toLowerCase().trim() });
-      if (user) return user;
+    if (isDbConnected()) {
+      try {
+        if (mongoose.Types.ObjectId.isValid(identifier)) {
+          const user = await User.findById(identifier);
+          if (user) return user;
+        } else {
+          const user = await User.findOne({ email: identifier.toLowerCase().trim() });
+          if (user) return user;
+        }
+      } catch (err) {
+        console.warn("MongoDB find failed, falling back to in-memory:", err.message);
+      }
     }
+
+    const memUser = (await inMemoryUserStore.findById(identifier)) || (await inMemoryUserStore.findByEmail(identifier));
+    if (memUser) return memUser;
   }
   return await getOrCreateElderlyUser();
 }
@@ -66,7 +86,7 @@ exports.getProfile = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Profile retrieved successfully.",
-      user: user.toSafeObject(),
+      user: typeof user.toSafeObject === "function" ? user.toSafeObject() : user,
     });
   } catch (error) {
     console.error("Get Profile Error:", error);
@@ -105,12 +125,25 @@ exports.updateProfile = async (req, res) => {
     if (residentialAddress !== undefined) user.residentialAddress = residentialAddress.trim();
     if (medicalId !== undefined) user.medicalId = medicalId.trim();
 
-    await user.save();
+    if (typeof user.save === "function") {
+      try {
+        await user.save();
+      } catch (err) {
+        console.warn("MongoDB user.save failed:", err.message);
+      }
+    }
+    await inMemoryUserStore.updateUser(user._id || user.id, {
+      fullName: user.fullName,
+      age: user.age,
+      phone: user.phone,
+      residentialAddress: user.residentialAddress,
+      medicalId: user.medicalId,
+    });
 
     return res.status(200).json({
       success: true,
       message: "Profile details updated successfully.",
-      user: user.toSafeObject(),
+      user: typeof user.toSafeObject === "function" ? user.toSafeObject() : user,
     });
   } catch (error) {
     console.error("Update Profile Error:", error);
@@ -157,13 +190,22 @@ exports.updateAccessibility = async (req, res) => {
       }
     }
 
-    await user.save();
+    if (typeof user.save === "function") {
+      try {
+        await user.save();
+      } catch (err) {
+        console.warn("MongoDB user.save failed:", err.message);
+      }
+    }
+    await inMemoryUserStore.updateUser(user._id || user.id, {
+      accessibilitySettings: user.accessibilitySettings,
+    });
 
     return res.status(200).json({
       success: true,
       message: "Elderly accessibility preferences saved successfully.",
       accessibilitySettings: user.accessibilitySettings,
-      user: user.toSafeObject(),
+      user: typeof user.toSafeObject === "function" ? user.toSafeObject() : user,
     });
   } catch (error) {
     console.error("Update Accessibility Error:", error);

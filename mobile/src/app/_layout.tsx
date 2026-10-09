@@ -53,6 +53,7 @@ function RootNavigator() {
         <Stack.Screen name="(app)" />
         <Stack.Screen name="(patient)" />
         <Stack.Screen name="(caregiver)" />
+        <Stack.Screen name="complete-profile" />
       </Stack.Protected>
     </Stack>
   );

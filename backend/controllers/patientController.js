@@ -48,37 +48,40 @@ const defaultPatients = [
 ];
 
 const defaultPatient = defaultPatients[0];
+const isDbConnected = () => mongoose.connection.readyState === 1;
 
 // @desc    Get linked patients for caregiver
 // @route   GET /api/patients
 // @access  Public / Protected
 exports.getPatients = async (req, res) => {
   try {
-    const dbPatients = await Patient.find();
+    const dbPatients = isDbConnected() ? await Patient.find() : [];
     let registeredPatients = [];
 
-    try {
-      const users = await User.find({ role: { $nin: ['caregiver', 'Caregiver'] } });
-      registeredPatients = users.map((u) => ({
-        _id: u._id.toString(),
-        name: u.fullName || 'Registered Patient',
-        age: u.age || 65,
-        role: 'Patient',
-        statusBadgeText: 'MONITORING ACTIVE',
-        phone: u.emergencyContact?.phone || u.phone || '+94 77 000 0000',
-        bloodGroup: u.bloodGroup || 'O+',
-        primaryDiagnosis: u.primaryDiagnosis || 'General Monitoring',
-        allergies: u.allergies || 'None recorded',
-        avatarUrl: u.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
-        vitals: {
-          bloodPressure: u.vitals?.bloodPressure || '120/80',
-          heartRate: u.vitals?.heartRate || 75,
-          bloodSugar: u.vitals?.bloodSugar || 115,
-          lastUpdated: new Date(),
-        },
-      }));
-    } catch {
-      // Ignore user query failures
+    if (isDbConnected()) {
+      try {
+        const users = await User.find({ role: { $nin: ['caregiver', 'Caregiver'] } });
+        registeredPatients = users.map((u) => ({
+          _id: u._id.toString(),
+          name: u.fullName || 'Registered Patient',
+          age: u.age || 65,
+          role: 'Patient',
+          statusBadgeText: 'MONITORING ACTIVE',
+          phone: u.emergencyContact?.phone || u.phone || '+94 77 000 0000',
+          bloodGroup: u.bloodGroup || 'O+',
+          primaryDiagnosis: u.primaryDiagnosis || 'General Monitoring',
+          allergies: u.allergies || 'None recorded',
+          avatarUrl: u.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
+          vitals: {
+            bloodPressure: u.vitals?.bloodPressure || '120/80',
+            heartRate: u.vitals?.heartRate || 75,
+            bloodSugar: u.vitals?.bloodSugar || 115,
+            lastUpdated: new Date(),
+          },
+        }));
+      } catch {
+        // Ignore user query failures
+      }
     }
 
     // Combine dbPatients, registeredPatients, and defaultPatients without duplicates
@@ -102,7 +105,7 @@ exports.getPatients = async (req, res) => {
 // @access  Public / Protected
 exports.getPatientById = async (req, res) => {
   try {
-    const patient = await Patient.findById(req.params.id);
+    const patient = isDbConnected() ? await Patient.findById(req.params.id) : null;
     if (!patient) {
       const foundSample = defaultPatients.find((p) => p._id === req.params.id);
       return res.json(foundSample || defaultPatient);

@@ -1,4 +1,6 @@
-import { useSyncExternalStore } from 'react';
+import { useSyncExternalStore, useMemo } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { API_BASE_URL } from './api-config';
 
 /**
@@ -8,6 +10,8 @@ import { API_BASE_URL } from './api-config';
 export interface Medication {
   id: number | string;
   _id?: string;
+  patientId?: string;
+  user_id?: string;
   name: string;
   purpose: string;
   form: 'Tablet' | 'Capsule' | 'Syrup';
@@ -32,10 +36,11 @@ export interface DoseScheduleItem {
   period: 'Morning' | 'Afternoon' | 'Evening';
 }
 
-// Initial Seed Data matching prompt specifications
-const INITIAL_MEDICATIONS: Medication[] = [
+// Demo Seed Data (only for demo prototype user)
+export const INITIAL_MEDICATIONS: Medication[] = [
   {
     id: '66f000000000000000000001',
+    patientId: '650000000000000000000001',
     name: 'Lisinopril 10mg',
     purpose: 'Blood pressure',
     form: 'Tablet',
@@ -53,6 +58,7 @@ const INITIAL_MEDICATIONS: Medication[] = [
   },
   {
     id: '66f000000000000000000002',
+    patientId: '650000000000000000000001',
     name: 'Atorvastatin 20mg',
     purpose: 'Cholesterol',
     form: 'Tablet',
@@ -69,7 +75,8 @@ const INITIAL_MEDICATIONS: Medication[] = [
     image: '',
   },
   {
-    id: '66f00000000000000000003',
+    id: '66f000000000000000000003',
+    patientId: '650000000000000000000002',
     name: 'Metformin 500mg',
     purpose: 'Diabetes management',
     form: 'Tablet',
@@ -86,7 +93,8 @@ const INITIAL_MEDICATIONS: Medication[] = [
     image: '',
   },
   {
-    id: '66f00000000000000000004',
+    id: '66f000000000000000000004',
+    patientId: '650000000000000000000001',
     name: 'Amlodipine 5mg',
     purpose: 'Blood pressure',
     form: 'Tablet',
@@ -119,6 +127,8 @@ function normalizeMedication(raw: any): Medication {
   return {
     id,
     _id: raw._id ? String(raw._id) : String(id),
+    patientId: raw.patientId ? String(raw.patientId) : (raw.user_id ? String(raw.user_id) : undefined),
+    user_id: raw.user_id ? String(raw.user_id) : undefined,
     name: raw.name || '',
     purpose: raw.purpose || '',
     form: raw.form || 'Tablet',
@@ -136,8 +146,8 @@ function normalizeMedication(raw: any): Medication {
   };
 }
 
-// Module-level in-memory reactive store
-let medicationsStore: Medication[] = [...INITIAL_MEDICATIONS];
+// Module-level in-memory reactive store starts EMPTY for new users
+let medicationsStore: Medication[] = [];
 let nextMedicationId = 100;
 let listeners: Array<() => void> = [];
 
@@ -158,17 +168,43 @@ export function getMedicationsSnapshot(): Medication[] {
   return medicationsStore;
 }
 
+export function clearMedicationsStore(): void {
+  medicationsStore = [];
+  emitChange();
+}
+
 /**
  * useMedications Hook
  * Synchronizes with the module-level reactive store via useSyncExternalStore.
- * Ensures Patient Dashboard, Medication List, Detail, and Form stay in sync.
+ * If userId is provided, strictly filters to only medications belonging to this user.
  */
-export function useMedications(): Medication[] {
-  return useSyncExternalStore(
+export function useMedications(userId?: string): Medication[] {
+  const allMeds = useSyncExternalStore(
     subscribeMedications,
     getMedicationsSnapshot,
     getMedicationsSnapshot
   );
+
+  return useMemo(() => {
+    if (!userId) return allMeds;
+
+    return allMeds.filter((m) => {
+      const pId = m.patientId ? String(m.patientId) : '';
+      const uId = m.user_id ? String(m.user_id) : '';
+      const currentId = String(userId);
+
+      if (pId === currentId || uId === currentId) {
+        return true;
+      }
+
+      // Only allow demo seed if this is explicitly the milestone demo patient
+      if (!pId && !uId && (currentId === '650000000000000000000001' || currentId === 'default')) {
+        return true;
+      }
+
+      return false;
+    });
+  }, [allMeds, userId]);
 }
 
 // Helper time calculation utilities
@@ -242,13 +278,27 @@ export function getFlattenedDoses(
 }
 
 /**
- * Fetch all medications from MongoDB backend API
+ * Fetch all medications from MongoDB backend API for a specific user
  */
-export async function listMedications(): Promise<Medication[]> {
+export async function listMedications(userId?: string): Promise<Medication[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/medications`, {
-      headers: { Accept: 'application/json' },
+    let token: string | null = null;
+    try {
+      if (Platform.OS === 'web') {
+        token = globalThis.localStorage?.getItem('medicare.access-token') ?? null;
+      } else {
+        token = await SecureStore.getItemAsync('medicare.access-token');
+      }
+    } catch {}
+
+    const query = userId ? `?patientId=${encodeURIComponent(userId)}` : '';
+    const res = await fetch(`${API_BASE_URL}/api/medications${query}`, {
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
     });
+
     if (res.ok) {
       const json = await res.json();
       if (json && Array.isArray(json.data)) {
@@ -269,8 +319,20 @@ export async function listMedications(): Promise<Medication[]> {
 export async function getMedication(id: number | string): Promise<Medication | null> {
   const idStr = String(id);
   try {
+    let token: string | null = null;
+    try {
+      if (Platform.OS === 'web') {
+        token = globalThis.localStorage?.getItem('medicare.access-token') ?? null;
+      } else {
+        token = await SecureStore.getItemAsync('medicare.access-token');
+      }
+    } catch {}
+
     const res = await fetch(`${API_BASE_URL}/api/medications/${idStr}`, {
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
     });
     if (res.ok) {
       const json = await res.json();
@@ -289,10 +351,13 @@ export async function getMedication(id: number | string): Promise<Medication | n
  * Add medication to MongoDB via backend API
  */
 export async function addMedication(
-  item: Omit<Medication, 'id' | 'taken'> & { taken?: Record<string, boolean> }
+  item: Omit<Medication, 'id' | 'taken'> & { taken?: Record<string, boolean>; patientId?: string },
+  userId?: string
 ): Promise<Medication> {
+  const targetPatientId = item.patientId || userId || '';
   const payload = {
     ...item,
+    patientId: targetPatientId,
     meal: item.meal || 'After food',
     start: item.start || '',
     end: item.end || '',
@@ -304,11 +369,21 @@ export async function addMedication(
   };
 
   try {
+    let token: string | null = null;
+    try {
+      if (Platform.OS === 'web') {
+        token = globalThis.localStorage?.getItem('medicare.access-token') ?? null;
+      } else {
+        token = await SecureStore.getItemAsync('medicare.access-token');
+      }
+    } catch {}
+
     const res = await fetch(`${API_BASE_URL}/api/medications`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(payload),
     });
@@ -516,5 +591,3 @@ export async function toggleRefillAlert(id: number | string): Promise<boolean> {
   return updated.alert;
 }
 
-// Automatically fetch from backend API on launch to hydrate reactive store
-listMedications().catch(() => {});

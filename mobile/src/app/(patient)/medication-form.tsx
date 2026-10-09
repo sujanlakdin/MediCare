@@ -16,8 +16,10 @@ import Toast from '../../components/auth/Toast';
 import PatientIcon from '../../components/patient/PatientIcons';
 import MedicationImagePicker from '../../components/patient/MedicationImagePicker';
 import { PATIENT_COLORS } from '../../constants/patientTheme';
+import { useAuth } from '../../contexts/auth-context';
 import {
   useMedications,
+  listMedications,
   addMedication,
   updateMedication,
   deleteMedication,
@@ -42,7 +44,14 @@ const FORM_SUBTITLES: Record<FormType, string> = {
 
 export default function MedicationFormScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
-  const medications = useMedications();
+  const { user } = useAuth();
+  const medications = useMedications(user?.id);
+
+  useEffect(() => {
+    if (user?.id) {
+      listMedications(user.id);
+    }
+  }, [user?.id]);
   const editId = params.id ? String(params.id) : null;
   const isEditing = !!editId;
 
@@ -227,21 +236,25 @@ export default function MedicationFormScreen() {
           router.back();
         }, 350);
       } else {
-        await addMedication({
-          name: name.trim(),
-          purpose: purpose.trim(),
-          form,
-          qty,
-          meal,
-          times: cleanTimes,
-          days,
-          repeat,
-          start: start.trim(),
-          end: end.trim(),
-          stock: stockNumber,
-          alert,
-          image,
-        });
+        await addMedication(
+          {
+            name: name.trim(),
+            purpose: purpose.trim(),
+            form,
+            qty,
+            meal,
+            times: cleanTimes,
+            days,
+            repeat,
+            start: start.trim(),
+            end: end.trim(),
+            stock: stockNumber,
+            alert,
+            image,
+            patientId: user?.id,
+          },
+          user?.id
+        );
         showToast('Medication added');
         setTimeout(() => {
           router.replace('/(patient)/medications' as any);

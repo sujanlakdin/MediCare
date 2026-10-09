@@ -9,6 +9,17 @@ export type AuthUser = {
   fullName: string;
   email: string;
   role?: 'patient' | 'caregiver';
+  age?: number;
+  dateOfBirth?: string;
+  gender?: string;
+  bloodGroup?: string;
+  phone?: string;
+  emergencyContact?: {
+    name?: string;
+    relationship?: string;
+    phone?: string;
+    email?: string;
+  };
 };
 
 type AuthContextValue = {
@@ -19,6 +30,7 @@ type AuthContextValue = {
   register: (fullName: string, email: string, password: string, role?: 'patient' | 'caregiver') => Promise<void>;
   signOut: () => Promise<void>;
   switchRole: (role: 'patient' | 'caregiver') => Promise<void>;
+  updateUser: (updatedFields: Partial<AuthUser>) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -136,8 +148,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setUser((prev) => (prev ? { ...prev, role: newRole } : { id: 'default', fullName: 'User', email: 'user@medicare.com', role: newRole }));
   }
 
+  function updateUser(updatedFields: Partial<AuthUser>) {
+    setUser((prev) => (prev ? { ...prev, ...updatedFields } : null));
+  }
+
   return (
-    <AuthContext.Provider value={{ token, user, isLoading, signIn, register, signOut, switchRole }}>
+    <AuthContext.Provider value={{ token, user, isLoading, signIn, register, signOut, switchRole, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

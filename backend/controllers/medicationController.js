@@ -85,18 +85,30 @@ const isDbConnected = () => mongoose.connection.readyState === 1;
 
 /**
  * GET /api/medications
- * Retrieve patient medications filtered by patientId if provided.
+ * Retrieve patient medications filtered by patientId/userId.
  */
 exports.getMedications = async (req, res) => {
   try {
-    const { patientId } = req.query;
+    const targetUserId = req.query.patientId || req.query.userId || (req.userId ? req.userId.toString() : null);
 
     if (isDbConnected()) {
-      const filter = patientId ? { patientId } : {};
+      let filter = {};
+      if (targetUserId) {
+        const conditions = [{ patientId: String(targetUserId) }];
+        if (mongoose.isValidObjectId(targetUserId)) {
+          conditions.push({ user_id: new mongoose.Types.ObjectId(targetUserId) });
+        }
+        filter = { $or: conditions };
+      }
+
       let medications = await Medication.find(filter).sort({ createdAt: -1 });
 
-      if (medications.length === 0 && !patientId) {
-        medications = await Medication.insertMany(localMeds);
+      // Only seed dummy meds if no user filter was requested AND database has 0 medications total
+      if (medications.length === 0 && !targetUserId) {
+        const totalCount = await Medication.countDocuments();
+        if (totalCount === 0) {
+          medications = await Medication.insertMany(localMeds);
+        }
       }
 
       return res.status(200).json({
@@ -108,9 +120,13 @@ exports.getMedications = async (req, res) => {
     }
 
     // Graceful fallback when MongoDB Atlas connection is pending
-    let filteredLocal = localMeds;
-    if (patientId) {
-      filteredLocal = localMeds.filter((m) => m.patientId === patientId || (!m.patientId && patientId === '650000000000000000000001'));
+    let filteredLocal = [];
+    if (targetUserId) {
+      filteredLocal = localMeds.filter(
+        (m) => m.patientId === String(targetUserId) || String(m.user_id) === String(targetUserId)
+      );
+    } else {
+      filteredLocal = localMeds;
     }
 
     res.status(200).json({
@@ -124,8 +140,8 @@ exports.getMedications = async (req, res) => {
     res.status(200).json({
       success: true,
       source: "memory-fallback",
-      count: localMeds.length,
-      data: localMeds,
+      count: 0,
+      data: [],
     });
   }
 };
@@ -210,6 +226,8 @@ exports.createMedication = async (req, res) => {
       ? [...new Set(days)].sort()
       : [0, 1, 2, 3, 4, 5, 6];
 
+    const targetUserId = patientId || req.body.userId || (req.userId ? req.userId.toString() : "");
+
     const medData = {
       name: name.trim(),
       purpose: (purpose || "").trim(),
@@ -225,7 +243,8 @@ exports.createMedication = async (req, res) => {
       alert: alert !== undefined ? Boolean(alert) : true,
       taken: taken || {},
       image: image || "",
-      patientId: patientId || "",
+      patientId: targetUserId,
+      user_id: req.userId || (mongoose.isValidObjectId(targetUserId) ? new mongoose.Types.ObjectId(targetUserId) : undefined),
     };
 
     if (isDbConnected()) {
