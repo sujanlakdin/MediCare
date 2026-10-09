@@ -32,7 +32,7 @@ interface NavItemDef {
 
 const NAV_ITEMS: NavItemDef[] = [
   { key: 'home', label: 'Home', icon: 'home', route: '/(patient)/menu' },
-  { key: 'alert', label: 'Alert', icon: 'bell', route: '/alerts' },
+  { key: 'alert', label: 'Alert', icon: 'bell', route: '/(patient)/dose-alerts' },
   { key: 'report', label: 'Report', icon: 'chart', route: '/reports' },
   { key: 'settings', label: 'Settings', icon: 'settings', route: '/(patient)/settings' },
   { key: 'profile', label: 'Profile', icon: 'user', route: '/(patient)/profile' },
